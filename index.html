@@ -7,7 +7,9 @@
 <meta name="description" content="Vizier4Dev demo: a queue-driven workspace for grant-funded programmes — sources, framework, collection, reporting, signals and funding. Fictional data." />
 <style>
 :root{
-  --ink:#191A20; --ink-2:#3D4049; --muted:#6B7080; --faint:#9AA0AE;
+  color-scheme:light;   /* the workspace commits to a paper-light ground; keep native controls in step */
+  /* --muted and --faint carry small text, so both clear 4.5:1 on white, on the canvas and on tag grounds */
+  --ink:#191A20; --ink-2:#3D4049; --muted:#5F6673; --faint:#656D7B;
   --canvas:#F1F2F5; --paper:#FFFFFF; --line:#E1E3EA; --line-2:#EEF0F4;
   --accent:#4B3FA8; --accent-2:#6C5FD0; --accent-soft:#EFEDFB;
   --bad:#B3261E; --bad-bg:#FCF1F0; --bad-line:#EEC0BC;
@@ -19,11 +21,27 @@
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
-body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;}
 button{cursor:pointer;background:none;border:none;padding:0;}
 mark{background:#F6E7A8;padding:0 2px;}
-.mono{font-family:var(--mono);}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+
+/* One visible focus indicator for everything reachable by keyboard. */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:3px;}
+.skip{position:absolute;left:-9999px;top:0;z-index:100;background:var(--accent);color:#fff;
+  padding:9px 14px;border-radius:0 0 4px 0;font-size:13px;font-weight:600;}
+.skip:focus{left:0;}
+
+/* Motion is opt-in: every animated change also has a static cue. */
+@media (prefers-reduced-motion:no-preference){
+  .fade{animation:fade .26s cubic-bezier(.4,0,.2,1);}
+  .bar>i{transition:width .9s cubic-bezier(.4,0,.2,1);}
+  .btn:active,.tbtn:active,.chip:active{transform:scale(.96);}
+  .btn,.tbtn,.chip{transition-property:background-color,border-color,color,transform;transition-duration:.15s;}
+}
+@keyframes fade{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
 
 /* ---------------- chrome: top bar, command bar, tab strip ---------------- */
 .top{background:var(--paper);border-bottom:1px solid var(--line);padding:9px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
@@ -67,12 +85,13 @@ mark{background:#F6E7A8;padding:0 2px;}
 .qempty{padding:16px 13px;font-size:12.5px;color:var(--muted);}
 
 /* ---------------- primitives ---------------- */
-h1.page{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0;}
-.page-sub{color:var(--muted);font-size:13px;margin:5px 0 0;max-width:76ch;}
+h1.page{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.15;text-wrap:balance;}
+.page-sub{color:var(--muted);font-size:13px;margin:5px 0 0;max-width:72ch;text-wrap:pretty;}
 .pagehead{margin-bottom:18px;}
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:18px;}
 .panel+.panel{margin-top:14px;}
-.panel h2{font-family:var(--serif);font-size:16px;font-weight:600;margin:0 0 11px;}
+.panel h2{font-family:var(--serif);font-size:16px;font-weight:600;margin:0 0 11px;line-height:1.25;text-wrap:balance;}
+.qh{font-size:12.5px;font-weight:700;margin:0;}
 .rule{height:1px;background:var(--line);margin:14px -18px;}
 .grid{display:grid;gap:14px;}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -99,18 +118,19 @@ td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line-2);vertical-align:t
 .note{border-left:2px solid var(--accent-2);background:var(--accent-soft);padding:10px 12px;font-size:12.5px;}
 .locked{border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:11px 13px;font-size:13px;margin-bottom:14px;}
 .stat{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:15px;}
-.stat .v{font-family:var(--serif);font-size:29px;letter-spacing:-.02em;}
+.stat .v{font-family:var(--serif);font-size:29px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
 .stat .k{font-size:12.5px;color:var(--muted);}
 .stat .s{font-size:11px;color:var(--faint);}
 .flagline{font-size:11.5px;margin-top:4px;display:flex;gap:5px;align-items:flex-start;}
 .flagline.red{color:var(--bad);} .flagline.amber{color:var(--warn);} .flagline.green{color:var(--good);}
 .bar{height:6px;background:#E5E7EC;border-radius:99px;overflow:hidden;}
-.bar>i{display:block;height:100%;background:var(--accent-2);transition:width .9s cubic-bezier(.4,0,.2,1);}
+.bar>i{display:block;height:100%;background:var(--accent-2);}
 .insight{background:var(--ink);color:#D9DBE2;border-radius:4px;padding:16px;}
 .insight .h{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.15em;color:#A99CF0;margin-bottom:6px;}
 .item{border:1px solid var(--line);border-radius:4px;padding:12px;background:#fff;}
 .item+.item{margin-top:9px;}
-.dz{border:1px dashed var(--accent-2);background:var(--accent-soft);border-radius:4px;padding:36px 20px;text-align:center;cursor:pointer;}
+.dz{border:1px dashed var(--accent-2);background:var(--accent-soft);border-radius:4px;padding:36px 20px;
+  text-align:center;cursor:pointer;width:100%;display:block;color:inherit;font:inherit;}
 .dz:hover{background:#E6E3F8;}
 .docrow{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:4px;padding:9px 11px;background:#fff;cursor:pointer;}
 .docrow:hover{border-color:var(--accent);}
@@ -119,7 +139,11 @@ td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line-2);vertical-align:t
 .frow+.frow{margin-top:6px;}
 .frow.dragging{opacity:.35;}
 .frow.over{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
-.handle{cursor:grab;color:var(--faint);font-family:var(--mono);}
+/* Row controls stay small visually but keep a 24px target. */
+.handle{cursor:grab;color:var(--faint);font-family:var(--mono);min-width:24px;min-height:24px;
+  display:inline-flex;align-items:center;justify-content:center;border-radius:3px;}
+button.handle{cursor:pointer;}
+button.handle:hover{color:var(--ink);background:var(--line-2);}
 .sec{border:1px solid var(--line);border-radius:4px;background:#FAFAFC;padding:14px;}
 .sec+.sec{margin-top:11px;}
 .doc-body{white-space:pre-wrap;font-family:var(--mono);font-size:12px;line-height:1.65;background:#FAFAFC;border:1px solid var(--line);border-radius:4px;padding:14px;max-height:56vh;overflow:auto;}
@@ -130,9 +154,7 @@ td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line-2);vertical-align:t
 #coach{position:fixed;right:22px;bottom:22px;z-index:80;max-width:330px;background:var(--ink);color:#E4E6EC;border-radius:4px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.3);}
 #coach .step{font-family:var(--mono);font-size:9.5px;color:#A99CF0;letter-spacing:.15em;margin-bottom:6px;}
 .hidden{display:none !important;}
-.fade{animation:fade .26s cubic-bezier(.4,0,.2,1);}
-@keyframes fade{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
-.small{font-size:11.5px;color:var(--muted);}
+.small{font-size:11.5px;color:var(--muted);text-wrap:pretty;}
 .chiprow{display:flex;flex-wrap:wrap;gap:7px;}
 .chip{border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:12px;color:var(--muted);background:#fff;}
 .chip:hover{border-color:var(--accent);color:var(--accent);}
@@ -144,38 +166,48 @@ td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line-2);vertical-align:t
   .queue{width:100%;position:static;}
   .g2,.g3{grid-template-columns:1fr;}
 }
+/* iOS zooms the page when an input's text is under 16px. */
+@media(max-width:640px){
+  .field,.cmd input{font-size:16px;}
+}
 </style>
 </head>
 <body>
 
-<div class="top">
+<a class="skip" href="#surface">Skip to the workspace</a>
+<header class="top">
   <div class="wordmark">Vizier<i>4dev</i></div>
   <div class="proj"><b>Cold Chain for Rural Clinics</b><span id="projline">€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period</span></div>
   <div class="grow"></div>
-  <div class="cmd"><span class="small">?</span><input id="cmd" placeholder="Ask this programme anything…" onkeydown="if(event.key==='Enter')ask()"/><span class="k">↵</span></div>
-  <div class="seg" id="personas">
-    <button id="p-lead" class="active" onclick="setPersona('lead')">Lead</button>
-    <button id="p-partner" onclick="setPersona('partner')">Partner</button>
-    <button id="p-mel" onclick="setPersona('mel')">MEL reviewer</button>
+  <div class="cmd"><span class="small" aria-hidden="true">?</span>
+    <label class="skip" for="cmd">Ask this programme a question</label>
+    <input id="cmd" placeholder="Ask this programme anything…" onkeydown="if(event.key==='Enter')ask()"/>
+    <span class="k" aria-hidden="true">↵</span></div>
+  <div class="seg" id="personas" role="group" aria-label="Viewing role">
+    <button id="p-lead" class="active" aria-pressed="true" onclick="setPersona('lead')">Lead</button>
+    <button id="p-partner" aria-pressed="false" onclick="setPersona('partner')">Partner</button>
+    <button id="p-mel" aria-pressed="false" onclick="setPersona('mel')">MEL reviewer</button>
   </div>
-  <div class="seg"><button id="lang-en" onclick="setLang('en')">EN</button><button id="lang-ru" onclick="setLang('ru')">RU</button></div>
+  <div class="seg" role="group" aria-label="Interface language">
+    <button id="lang-en" aria-pressed="true" onclick="setLang('en')">EN</button>
+    <button id="lang-ru" aria-pressed="false" onclick="setLang('ru')">RU</button></div>
   <button class="tbtn" id="b-tour" onclick="startTour()">Tour</button>
   <button class="tbtn" id="b-reset" onclick="resetDemo()">Reset</button>
-</div>
-<div class="tabs" id="tabs"></div>
+</header>
+<nav class="tabs" id="tabs" aria-label="Workspaces"></nav>
 
 <div class="wrap">
-  <div class="queue"><div class="qcard">
-    <div class="qhead"><b id="qtitle">What needs you</b><span class="grow"></span><span class="tag" id="qcount">0</span></div>
+  <aside class="queue" aria-labelledby="qtitle"><div class="qcard">
+    <div class="qhead"><h2 class="qh" id="qtitle">What needs you</h2><span class="grow"></span><span class="tag" id="qcount">0</span></div>
     <div id="qlist"></div>
   </div>
   <div class="small" style="margin-top:9px" id="qnote">The queue is built from the donor’s rules and the current state of the reporting period. It changes with your role.</div>
-  </div>
-  <div class="surface" id="surface"></div>
+  </aside>
+  <main class="surface" id="surface" tabindex="-1"></main>
 </div>
 
-<div id="toast" class="hidden"></div>
-<div id="coach" class="hidden"></div>
+<div id="toast" class="hidden" role="status" aria-live="polite"></div>
+<div id="coach" class="hidden" role="region" aria-label="Guided tour"></div>
 
 <script>
 /* ==========================================================================
@@ -518,12 +550,33 @@ function toast(m){const t=document.getElementById('toast');t.innerHTML=localize(
 function head(t,s){return `<div class="pagehead"><h1 class="page">${t}</h1>${s?`<p class="page-sub">${s}</p>`:''}</div>`;}
 function panel(i,c=''){return `<div class="panel ${c}">${i}</div>`;}
 function locked(m,ws,sub,label){return `<div class="locked">${m}</div>`+(ws?`<button class="btn" onclick="go('${ws}'${sub?",'"+sub+"'":''})">${label}</button>`:'');}
-function src(doc,anchor,label){return `<span class="src" onclick="openSource('${doc}','${attr(anchor||'')}')">${esc(label||SRC[doc].name)}</span>`;}
+function src(doc,anchor,label){
+ const name=esc(label||SRC[doc].name);
+ return `<button type="button" class="src" onclick="openSource('${doc}','${attr(anchor||'')}')"
+   aria-label="Open the source: ${attr(SRC[doc].name)}">${name}</button>`;}
 function stat(k,v,s){return `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div><div class="s">${s||''}</div></div>`;}
 function insight(t,b,act){return `<div class="insight"><div class="h">${t}</div><div>${b}</div>${act?`<div style="margin-top:11px"><button class="btn sm" onclick="toast('Added to your actions for this quarter.')">${act}</button></div>`:''}</div>`;}
-function modal(html,w='560px'){const d=document.createElement('div');d.className='modal-wrap';d.onclick=e=>{if(e.target===d)d.remove();};
- d.innerHTML=localize(`<div class="modal" style="max-width:${w}">${html}<div style="text-align:right;margin-top:16px"><button class="btn" onclick="this.closest('.modal-wrap').remove()">Close</button></div></div>`);
- document.body.appendChild(d);return d;}
+/* Dialogs: labelled, closable with Escape, focus moved in and handed back. */
+function modal(html,w='560px'){
+ const opener=document.activeElement;
+ const d=document.createElement('div');d.className='modal-wrap';
+ d.onclick=e=>{if(e.target===d)closeModal(d);};
+ d.innerHTML=localize(`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="max-width:${w}"><span id="dlg-title" class="skip">${(html.match(/<b[^>]*>([^<]{2,90})<\/b>/)||[,'Details'])[1]}</span>${html}
+   <div style="text-align:right;margin-top:16px"><button type="button" class="btn" onclick="closeModal(this.closest('.modal-wrap'))">Close</button></div></div>`);
+ d._opener=opener;
+ d.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.stopPropagation();closeModal(d);return;}
+  if(e.key!=='Tab')return;
+  const f=[...d.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null);
+  if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+ });
+ document.body.appendChild(d);
+ const target=d.querySelector('select,input,textarea,button');if(target)target.focus();
+ return d;}
+function closeModal(d){if(!d)return;const o=d._opener;d.remove();if(o&&document.contains(o))o.focus();}
 function openSource(docId,anchor){
  const d=SRC[docId];if(!d)return;let body=esc(d.text);
  if(anchor){const a=esc(anchor);const i=body.indexOf(a);if(i>=0)body=body.slice(0,i)+'<mark id="hl">'+body.slice(i,i+a.length)+'</mark>'+body.slice(i+a.length);}
@@ -629,7 +682,7 @@ const DICT={
 "Results":"Результаты","Costs":"Расходы","Returns in review":"Отчёты на проверке",
 "Your figures are checked against the donor rules and against your own source files as you type.":"Ваши цифры проверяются по правилам донора и по вашим же исходным файлам прямо при вводе.",
 "Status":"Статус","Draft — due in 6 working days":"Черновик — срок через 6 рабочих дней","Submitted — with the reviewer":"Сдан — у ревьюера",
-"Draft from my files":"Собрать из моих файлов","Submit":"Сдать","From your reviewer":"От вашего ревьюера",
+"Draft from my files":"Собрать из моих файлов","Submit return":"Сдать отчёт","From your reviewer":"От вашего ревьюера",
 "Drafted from RCC’s Q1 training logs and feedback export. Verify every figure before you submit.":"Собрано из журналов обучения RCC за Q1 и выгрузки обратной связи. Проверьте каждую цифру перед сдачей.",
 "clean":"чисто","Required by the donor form.":"Обязательно по форме донора.","Unresolved source conflict.":"Конфликт источников не разрешён.",
 "Numerator is larger than the denominator.":"Числитель больше знаменателя.","Attach evidence":"Приложить подтверждение",
@@ -839,8 +892,9 @@ function localize(html){
 }
 function setLang(l){
  LANG=l;try{localStorage.setItem('v4d_lang',l);}catch(e){}
- document.getElementById('lang-en').classList.toggle('active',l==='en');
- document.getElementById('lang-ru').classList.toggle('active',l==='ru');
+ ['en','ru'].forEach(x=>{const b=document.getElementById('lang-'+x);
+  b.classList.toggle('active',l===x);b.setAttribute('aria-pressed',String(l===x));});
+ document.documentElement.lang=l;
  applyStaticLang();render();
 }
 function applyStaticLang(){
@@ -866,7 +920,7 @@ function renderTabs(){
  document.getElementById('tabs').innerHTML=localize(WS.map(w=>{
   const n=q.filter(i=>i.ws===w.id&&i.sev==='red').length;
   const a=q.filter(i=>i.ws===w.id).length;
-  return `<button class="tab ${S.ws===w.id?'active':''}" onclick="go('${w.id}')">${w.label}
+  return `<button type="button" class="tab ${S.ws===w.id?'active':''}" ${S.ws===w.id?'aria-current="page"':''} onclick="go('${w.id}')">${w.label}
     ${n?`<span class="cnt">${n}</span>`:a?`<span class="cnt q">${a}</span>`:''}</button>`;}).join(''));
 }
 function go(ws,sub){
@@ -876,9 +930,10 @@ function go(ws,sub){
 function subOf(ws){const l=SUBNAV[ws];if(!l)return null;return S.sub[ws]||l[0][0];}
 function subnav(ws){const l=SUBNAV[ws];if(!l)return '';
  const cur=subOf(ws);
- return `<div class="subnav">${l.map(([id,lab])=>`<button class="${cur===id?'active':''}" onclick="go('${ws}','${id}')">${lab}</button>`).join('')}</div>`;}
+ return `<nav class="subnav" aria-label="Sections">${l.map(([id,lab])=>`<button type="button" class="${cur===id?'active':''}" ${cur===id?'aria-current="page"':''} onclick="go('${ws}','${id}')">${lab}</button>`).join('')}</nav>`;}
 function setPersona(p){
- S.persona=p;['lead','partner','mel'].forEach(x=>document.getElementById('p-'+x).classList.toggle('active',x===p));
+ S.persona=p;['lead','partner','mel'].forEach(x=>{const b=document.getElementById('p-'+x);
+  b.classList.toggle('active',x===p);b.setAttribute('aria-pressed',String(x===p));});
  if(p==='partner'){S.sub.collect='returns';go('collect');}
  else{S.sub.collect='review';go(S.ws==='collect'?'collect':S.ws);}
  toast('Now viewing as: <b>'+({lead:'Consortium lead',partner:'Partner focal point — Riverbend Community Care',mel:'MEL reviewer'})[p]+'</b>');
@@ -897,7 +952,7 @@ function render(){
 VIEW.sources=function(){
  if(!S.ingested){
   return head('Sources','Drop in the documents that already govern this programme. Vizier reads them as they are — no template to fill in first.')
-  +panel(`<div class="dz" onclick="ingest()"><div style="font-family:var(--serif);font-size:17px">Drop the project documents here</div>
+  +panel(`<button type="button" class="dz" onclick="ingest()"><div style="font-family:var(--serif);font-size:17px">Drop the project documents here</div>
     <div class="small" style="margin-top:5px">Call · proposal · results framework · budget · donor guidelines · partner logs</div>
     <div style="margin-top:14px"><button class="btn">Load the demo set</button></div></div>
     <div id="prog" class="small" style="margin-top:13px"></div>`)
@@ -975,13 +1030,15 @@ function fieldHTML(f,si,fi,ed){
  if(!ed)return `<div class="frow"><span style="flex:1">${esc(f.l)}</span><span class="tag">${FTYPES[f.t]}</span>${f.req?'<span class="tag bad">required</span>':''}</div>`;
  return `<div class="frow" draggable="true" ondragstart="dragStart(event,${si},${fi})" ondragend="dragEnd(event)"
    ondragover="dragOver(event,this)" ondragleave="this.classList.remove('over')" ondrop="dropField(event,${si},${fi})">
-   <span class="handle">⠿</span><input class="field" style="flex:1" value="${esc(f.l)}" oninput="setLabel(${si},${fi},this.value)"/>
-   <select class="field" style="width:150px" onchange="setType(${si},${fi},this.value)">
+   <span class="handle" aria-hidden="true">⠿</span>
+   <input class="field" style="flex:1" value="${esc(f.l)}" oninput="setLabel(${si},${fi},this.value)" aria-label="Field label"/>
+   <select class="field" style="width:150px" onchange="setType(${si},${fi},this.value)" aria-label="Field type for ${attr(f.l)}">
     ${Object.entries(FTYPES).map(([k,v])=>`<option value="${k}" ${f.t===k?'selected':''}>${v}</option>`).join('')}</select>
-   <button class="tag ${f.req?'bad':''}" onclick="toggleReq(${si},${fi})">${f.req?'required':'optional'}</button>
-   <button class="handle" onclick="moveField(${si},${fi},-1)" title="Move up">↑</button>
-   <button class="handle" onclick="moveField(${si},${fi},1)" title="Move down">↓</button>
-   <button class="handle" onclick="delField(${si},${fi})">✕</button></div>`;
+   <button type="button" class="tag ${f.req?'bad':''}" aria-pressed="${f.req?'true':'false'}"
+     onclick="toggleReq(${si},${fi})">${f.req?'required':'optional'}</button>
+   <button type="button" class="handle" onclick="moveField(${si},${fi},-1)" aria-label="Move ${attr(f.l)} up">↑</button>
+   <button type="button" class="handle" onclick="moveField(${si},${fi},1)" aria-label="Move ${attr(f.l)} down">↓</button>
+   <button type="button" class="handle" onclick="delField(${si},${fi})" aria-label="Remove ${attr(f.l)}">✕</button></div>`;
 }
 function refreshBuilder(){const b=document.getElementById('builder');if(b)b.innerHTML=TPL.sections.map((s,i)=>sectionHTML(s,i,can())).join('');}
 function setLabel(si,fi,v){TPL.sections[si].fields[fi].l=v;}
@@ -1027,7 +1084,7 @@ VIEW.returns=function(){
     <div style="flex:1"><div class="lbl">Status</div><div style="font-weight:650">${S.submitted?'Submitted — with the reviewer':'Draft — due in 6 working days'}</div></div>
     <span class="tag ${red?'bad':'good'}">${red} blocking</span><span class="tag ${amber?'warn':''}">${amber} to verify</span>
     <button class="btn ghost sm" onclick="aiDraft()">Draft from my files</button>
-    <button class="btn sm" onclick="submitReturn()">Submit</button></div>
+    <button type="button" class="btn sm" onclick="submitReturn()">Submit return</button></div>
    <div class="small" style="margin-top:7px">${esc(DRAFT_NOTE)}</div>`)
   +TPL.sections.map(s=>returnSection(s,flags)).join('');
 };
@@ -1046,14 +1103,16 @@ function returnField(ind,f,flag){
  const ver=(VERIFY[ind]&&VERIFY[ind][f.l])||'';
  const cm=(COMMENTS[ME]&&COMMENTS[ME].items&&COMMENTS[ME].items[ind+'::'+f.l])||'';
  const bc=flag?(flag.sev==='red'?'var(--bad-line)':'var(--warn-line)'):(ver==='ok'?'var(--good-line)':'var(--line)');
+ const id='f-'+ind.replace(/\W/g,'')+'-'+f.l.replace(/\W/g,'').slice(0,18);
+ const desc=flag?` aria-invalid="true" aria-describedby="${id}-msg"`:'';
  const ctl=f.t==='longtext'
-  ?`<textarea class="field" rows="3" style="border-color:${bc}" oninput="setVal('${ind}','${attr(f.l)}',this.value)">${esc(v)}</textarea>`
+  ?`<textarea id="${id}" class="field" rows="3" style="border-color:${bc}"${desc} oninput="setVal('${ind}','${attr(f.l)}',this.value)">${esc(v)}</textarea>`
   :f.t==='file'
-  ?`<button class="btn ghost sm" onclick="attachEvidence('${ind}','${attr(f.l)}')">${v?'✓ '+esc(v):'Attach evidence'}</button>`
-  :`<input class="field" style="border-color:${bc}" value="${esc(v)}" oninput="setVal('${ind}','${attr(f.l)}',this.value)"/>`;
+  ?`<button type="button" class="btn ghost sm" onclick="attachEvidence('${ind}','${attr(f.l)}')">${v?'✓ '+esc(v):'Attach evidence'}</button>`
+  :`<input id="${id}" class="field" style="border-color:${bc}"${desc} value="${esc(v)}" oninput="setVal('${ind}','${attr(f.l)}',this.value)"/>`;
  return `<div style="${f.t==='longtext'?'grid-column:1/-1':''}">
-  <div class="lbl" style="margin-bottom:4px">${esc(f.l)} ${f.req?'<span style="color:var(--bad)">*</span>':''}</div>${ctl}
-  ${flag?`<div class="flagline ${flag.sev==='red'?'red':'amber'}"><span>${flag.sev==='red'?'✕':'!'}</span><span>${esc(flag.msg)}</span></div>`:''}
+  <label class="lbl" style="margin-bottom:4px;display:block" ${f.t==='file'?'':`for="${id}"`}>${esc(f.l)} ${f.req?'<span style="color:var(--bad)" aria-hidden="true">*</span><span class="skip">required</span>':''}</label>${ctl}
+  ${flag?`<div id="${id}-msg" class="flagline ${flag.sev==='red'?'red':'amber'}"><span aria-hidden="true">${flag.sev==='red'?'✕':'!'}</span><span>${esc(flag.msg)}</span></div>`:''}
   ${!flag&&ver==='ok'?`<div class="flagline green"><span>✓</span><span>matches your Q1 source file</span></div>`:''}
   ${!flag&&ver==='check'?`<div class="flagline amber"><span>!</span><span>could not verify against a source — confirm it</span></div>`:''}
   ${cm?`<div class="flagline"><span>·</span><span>Reviewer: ${esc(cm)}</span></div>`:''}</div>`;
@@ -1421,7 +1480,7 @@ function exportResults(replace){
   <div style="margin-top:12px">${unmapped
    ?`<span class="tag bad">${unmapped} unmapped</span> <span class="small">The system rejects a submission with an unmapped indicator. Map them, or mark them as project-specific.</span>`
    :`<span class="tag good">ready to encode</span> <span class="small">All indicators carry a core-list target and a value with its source.</span>`}</div>
-  <div style="margin-top:12px"><button class="btn" ${unmapped?'disabled':''} onclick="toast('Demo only — the live product writes the encoded logframe into the donor system and stores the confirmation.');this.closest('.modal-wrap').remove()">Encode ${PERIOD.label}</button></div>`,'720px');
+  <div style="margin-top:12px"><button class="btn" ${unmapped?'disabled':''} onclick="toast('Demo only — the live product writes the encoded logframe into the donor system and stores the confirmation.');closeModal(this.closest('.modal-wrap'))">Encode ${PERIOD.label}</button></div>`,'720px');
 }
 function indicatorValue(code){
  const all=[SUB,OTHER_SUB['Terrace Health Trust'],OTHER_SUB['Summit Logistics Cooperative']];
@@ -1454,7 +1513,7 @@ function exportInterim(){
   <div style="margin-top:10px">${gaps.length
    ?`<span class="tag bad">${gaps.length} gap(s)</span> <span class="small">The form can be saved as a draft, but not submitted until these are closed.</span>`
    :'<span class="tag good">complete</span> <span class="small">Every sub-chapter has content and evidence behind it.</span>'}</div>
-  <div style="margin-top:12px"><button class="btn" onclick="toast('Demo only — the live product writes the form into the donor’s exchange system and keeps the submission receipt.');this.closest('.modal-wrap').remove()">${gaps.length?'Save as draft':'Submit the interim form'}</button></div>`,'720px');
+  <div style="margin-top:12px"><button class="btn" onclick="toast('Demo only — the live product writes the form into the donor’s exchange system and keeps the submission receipt.');closeModal(this.closest('.modal-wrap'))">${gaps.length?'Save as draft':'Submit the interim form'}</button></div>`,'720px');
 }
 
 /* ============================ SIGNALS =================================== */
@@ -1603,10 +1662,18 @@ function ask(){
 }
 function drawer(html){
  let d=document.getElementById('drawer');
- if(!d){d=document.createElement('div');d.id='drawer';document.body.appendChild(d);}
+ if(!d){
+  d=document.createElement('div');d.id='drawer';
+  d.setAttribute('role','dialog');d.setAttribute('aria-label','Answer from this programme');
+  d.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+  document.body.appendChild(d);
+ }
  d.innerHTML=localize(`<div style="display:flex;align-items:center;margin-bottom:14px"><span class="tag acc">Vizier</span><span style="flex:1"></span>
-   <button class="tbtn" onclick="document.getElementById('drawer').remove()">Close</button></div>`+html);
+   <button type="button" class="tbtn" onclick="closeDrawer()">Close</button></div>`+html);
+ const b=d.querySelector('button');if(b)b.focus();
 }
+function closeDrawer(){const d=document.getElementById('drawer');if(!d)return;d.remove();
+ const c=document.getElementById('cmd');if(c)c.focus();}
 
 /* ============================ TOUR / RESET ============================== */
 const TOUR=[
@@ -1650,7 +1717,8 @@ function resetDemo(){
  COSTS=defaultCosts();LEDGER=[];MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
  Object.assign(S,{persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
   consolidated:false,reviewTarget:'',propReviewed:false,curFit:PROP_REVIEW.fit});
- ['lead','partner','mel'].forEach(x=>document.getElementById('p-'+x).classList.toggle('active',x==='lead'));
+ ['lead','partner','mel'].forEach(x=>{const b=document.getElementById('p-'+x);
+  b.classList.toggle('active',x==='lead');b.setAttribute('aria-pressed',String(x==='lead'));});
  const d=document.getElementById('drawer');if(d)d.remove();
  endTour();render();toast('Demo reset.');
 }
