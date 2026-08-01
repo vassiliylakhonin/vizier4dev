@@ -33,7 +33,15 @@ The programme, the partners and every figure are invented. The rules the demo en
 
 Not legal, financial, compliance or audit advice. Human review is required before anything is filed with a donor.
 
+## Deployment
+
+`./deploy.sh` publishes `index.html`, `landing.html`, `robots.txt` and `_headers` to Cloudflare Pages. The repository itself stays private; only those four files are served.
+
+It runs on the `wrangler` login already present on the machine, so there is no API token to create and no secret to store anywhere. A `pre-push` hook runs it whenever `main` is pushed; delete `.git/hooks/pre-push` to go back to publishing by hand.
+
+The published site is closed to search engines — `robots.txt` disallows crawling and `_headers` sends `X-Robots-Tag: noindex, nofollow, noarchive`. It is reachable by anyone holding the address, so treat the address as the access control it is.
+
 ## Open items
 
-- The founder paragraph and the price block on `landing.html` are marked as drafts and must be filled in or removed before the page is published anywhere.
+- The founder paragraph and the price block on `landing.html` are marked as drafts. They must be filled in or removed before the page is shown to anyone outside a working conversation.
 - The contact link points at a personal mailbox; a domain address is the fix.
