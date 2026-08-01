@@ -979,6 +979,8 @@ function fieldHTML(f,si,fi,ed){
    <select class="field" style="width:150px" onchange="setType(${si},${fi},this.value)">
     ${Object.entries(FTYPES).map(([k,v])=>`<option value="${k}" ${f.t===k?'selected':''}>${v}</option>`).join('')}</select>
    <button class="tag ${f.req?'bad':''}" onclick="toggleReq(${si},${fi})">${f.req?'required':'optional'}</button>
+   <button class="handle" onclick="moveField(${si},${fi},-1)" title="Move up">↑</button>
+   <button class="handle" onclick="moveField(${si},${fi},1)" title="Move down">↓</button>
    <button class="handle" onclick="delField(${si},${fi})">✕</button></div>`;
 }
 function refreshBuilder(){const b=document.getElementById('builder');if(b)b.innerHTML=TPL.sections.map((s,i)=>sectionHTML(s,i,can())).join('');}
@@ -986,6 +988,9 @@ function setLabel(si,fi,v){TPL.sections[si].fields[fi].l=v;}
 function setType(si,fi,v){TPL.sections[si].fields[fi].t=v;refreshBuilder();}
 function toggleReq(si,fi){const f=TPL.sections[si].fields[fi];f.req=!f.req;refreshBuilder();}
 function delField(si,fi){TPL.sections[si].fields.splice(fi,1);refreshBuilder();}
+/* Same reorder as dragging, for anyone demoing on a trackpad or a touch screen. */
+function moveField(si,fi,d){const a=TPL.sections[si].fields,j=fi+d;
+ if(j<0||j>=a.length)return;[a[fi],a[j]]=[a[j],a[fi]];refreshBuilder();}
 function addField(si){TPL.sections[si].fields.push({l:'New field',t:'text',req:false});refreshBuilder();toast('Field added — rename it and pick a type.');}
 function delSection(si){if(confirm('Remove this indicator section?')){TPL.sections.splice(si,1);refreshBuilder();}}
 function moveSection(si,d){const j=si+d;if(j<0||j>=TPL.sections.length)return;const a=TPL.sections;[a[si],a[j]]=[a[j],a[si]];refreshBuilder();}
