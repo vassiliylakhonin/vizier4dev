@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vizier4Dev — programme reporting workspace</title>
+<meta name="description" content="Vizier4Dev demo: a queue-driven workspace for grant-funded programmes — sources, framework, collection, reporting, signals and funding. Fictional data." />
+<style>
+:root{
+  --ink:#191A20; --ink-2:#3D4049; --muted:#6B7080; --faint:#9AA0AE;
+  --canvas:#F1F2F5; --paper:#FFFFFF; --line:#E1E3EA; --line-2:#EEF0F4;
+  --accent:#4B3FA8; --accent-2:#6C5FD0; --accent-soft:#EFEDFB;
+  --bad:#B3261E; --bad-bg:#FCF1F0; --bad-line:#EEC0BC;
+  --warn:#8A5A00; --warn-bg:#FDF8EC; --warn-line:#E8D2A0;
+  --good:#1B6E3C; --good-bg:#EFF7F1; --good-line:#B3D7C0;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;}
+button{cursor:pointer;background:none;border:none;padding:0;}
+mark{background:#F6E7A8;padding:0 2px;}
+.mono{font-family:var(--mono);}
+
+/* ---------------- chrome: top bar, command bar, tab strip ---------------- */
+.top{background:var(--paper);border-bottom:1px solid var(--line);padding:9px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.wordmark{font-family:var(--serif);font-size:19px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:5px;}
+.wordmark i{font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.06em;background:var(--accent);color:#fff;border-radius:3px;padding:2px 5px;position:relative;top:-2px;}
+.proj{border-left:1px solid var(--line);padding-left:14px;min-width:0;}
+.proj b{font-size:13px;}
+.proj span{display:block;font-size:11px;color:var(--muted);}
+.grow{flex:1;}
+.cmd{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:4px;padding:5px 9px;background:#FAFAFC;min-width:min(320px,100%);}
+.cmd input{border:none;background:none;outline:none;width:100%;font-size:13px;}
+.cmd .k{font-family:var(--mono);font-size:9.5px;color:var(--faint);border:1px solid var(--line);border-radius:3px;padding:1px 4px;}
+.seg{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+.seg button{padding:5px 10px;font-size:12px;color:var(--muted);border-right:1px solid var(--line);white-space:nowrap;}
+.seg button:last-child{border-right:none;}
+.seg button.active{background:var(--ink);color:#fff;}
+.tbtn{border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;color:var(--muted);}
+.tbtn:hover{border-color:var(--accent);color:var(--accent);}
+
+.tabs{background:var(--paper);border-bottom:1px solid var(--line);padding:0 20px;display:flex;gap:2px;overflow-x:auto;position:sticky;top:0;z-index:30;}
+.tab{padding:10px 14px 9px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:7px;}
+.tab:hover{color:var(--ink);}
+.tab.active{color:var(--ink);font-weight:650;border-bottom-color:var(--accent);}
+.tab .cnt{font-family:var(--mono);font-size:9.5px;background:var(--bad);color:#fff;border-radius:99px;padding:1px 5px;}
+.tab .cnt.q{background:var(--line);color:var(--muted);}
+
+/* ---------------- body: queue + work surface ---------------- */
+.wrap{display:flex;gap:18px;padding:18px 20px 70px;align-items:flex-start;max-width:1440px;}
+.queue{width:290px;flex:none;position:sticky;top:56px;}
+.surface{flex:1;min-width:0;}
+.qcard{background:var(--paper);border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+.qhead{padding:11px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
+.qhead b{font-size:12.5px;}
+.qitem{display:block;width:100%;text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-2);}
+.qitem:hover{background:#FAFAFC;}
+.qitem:last-child{border-bottom:none;}
+.qitem .t{font-size:12.5px;font-weight:600;display:flex;gap:6px;align-items:flex-start;}
+.qitem .d{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.dot{width:6px;height:6px;border-radius:99px;flex:none;margin-top:6px;}
+.dot.red{background:var(--bad);} .dot.amber{background:#C9922B;} .dot.blue{background:var(--accent-2);} .dot.green{background:var(--good);}
+.qempty{padding:16px 13px;font-size:12.5px;color:var(--muted);}
+
+/* ---------------- primitives ---------------- */
+h1.page{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0;}
+.page-sub{color:var(--muted);font-size:13px;margin:5px 0 0;max-width:76ch;}
+.pagehead{margin-bottom:18px;}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:18px;}
+.panel+.panel{margin-top:14px;}
+.panel h2{font-family:var(--serif);font-size:16px;font-weight:600;margin:0 0 11px;}
+.rule{height:1px;background:var(--line);margin:14px -18px;}
+.grid{display:grid;gap:14px;}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:700;}
+.btn{border-radius:4px;padding:7px 13px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:1px solid var(--accent);}
+.btn:hover{background:#3F349A;}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--line);}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn.sm{padding:4px 9px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;border-radius:2px;padding:2px 6px;border:1px solid var(--line);color:var(--muted);background:#FAFAFC;}
+.tag.good{color:var(--good);background:var(--good-bg);border-color:var(--good-line);}
+.tag.warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn-line);}
+.tag.bad{color:var(--bad);background:var(--bad-bg);border-color:var(--bad-line);}
+.tag.acc{color:var(--accent);background:var(--accent-soft);border-color:#CFC9F2;}
+.src{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:10px;border-bottom:1px dotted var(--accent-2);color:var(--accent);cursor:pointer;padding-bottom:1px;}
+.src:hover{background:var(--accent-soft);}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:0 10px 7px 0;border-bottom:1px solid var(--line);font-weight:700;}
+td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line-2);vertical-align:top;font-size:13px;}
+.field{width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 9px;font-size:13px;background:#fff;}
+.field:focus{outline:2px solid var(--accent-soft);border-color:var(--accent);}
+.note{border-left:2px solid var(--accent-2);background:var(--accent-soft);padding:10px 12px;font-size:12.5px;}
+.locked{border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:11px 13px;font-size:13px;margin-bottom:14px;}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:15px;}
+.stat .v{font-family:var(--serif);font-size:29px;letter-spacing:-.02em;}
+.stat .k{font-size:12.5px;color:var(--muted);}
+.stat .s{font-size:11px;color:var(--faint);}
+.flagline{font-size:11.5px;margin-top:4px;display:flex;gap:5px;align-items:flex-start;}
+.flagline.red{color:var(--bad);} .flagline.amber{color:var(--warn);} .flagline.green{color:var(--good);}
+.bar{height:6px;background:#E5E7EC;border-radius:99px;overflow:hidden;}
+.bar>i{display:block;height:100%;background:var(--accent-2);transition:width .9s cubic-bezier(.4,0,.2,1);}
+.insight{background:var(--ink);color:#D9DBE2;border-radius:4px;padding:16px;}
+.insight .h{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.15em;color:#A99CF0;margin-bottom:6px;}
+.item{border:1px solid var(--line);border-radius:4px;padding:12px;background:#fff;}
+.item+.item{margin-top:9px;}
+.dz{border:1px dashed var(--accent-2);background:var(--accent-soft);border-radius:4px;padding:36px 20px;text-align:center;cursor:pointer;}
+.dz:hover{background:#E6E3F8;}
+.docrow{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:4px;padding:9px 11px;background:#fff;cursor:pointer;}
+.docrow:hover{border-color:var(--accent);}
+.docrow .ext{font-family:var(--mono);font-size:9px;font-weight:700;background:var(--ink);color:#fff;border-radius:2px;padding:2px 5px;}
+.frow{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:6px 9px;background:#fff;}
+.frow+.frow{margin-top:6px;}
+.frow.dragging{opacity:.35;}
+.frow.over{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.handle{cursor:grab;color:var(--faint);font-family:var(--mono);}
+.sec{border:1px solid var(--line);border-radius:4px;background:#FAFAFC;padding:14px;}
+.sec+.sec{margin-top:11px;}
+.doc-body{white-space:pre-wrap;font-family:var(--mono);font-size:12px;line-height:1.65;background:#FAFAFC;border:1px solid var(--line);border-radius:4px;padding:14px;max-height:56vh;overflow:auto;}
+.modal-wrap{position:fixed;inset:0;background:rgba(25,26,32,.5);z-index:90;display:flex;align-items:center;justify-content:center;padding:18px;}
+.modal{background:#fff;border-radius:4px;padding:22px;width:100%;box-shadow:0 24px 60px rgba(25,26,32,.28);}
+#drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,94vw);background:#fff;border-left:1px solid var(--line);box-shadow:-16px 0 44px rgba(25,26,32,.14);z-index:85;padding:20px;overflow:auto;}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 15px;border-radius:4px;font-size:13px;z-index:95;max-width:min(620px,92vw);box-shadow:0 10px 30px rgba(0,0,0,.22);}
+#coach{position:fixed;right:22px;bottom:22px;z-index:80;max-width:330px;background:var(--ink);color:#E4E6EC;border-radius:4px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.3);}
+#coach .step{font-family:var(--mono);font-size:9.5px;color:#A99CF0;letter-spacing:.15em;margin-bottom:6px;}
+.hidden{display:none !important;}
+.fade{animation:fade .26s cubic-bezier(.4,0,.2,1);}
+@keyframes fade{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+.small{font-size:11.5px;color:var(--muted);}
+.chiprow{display:flex;flex-wrap:wrap;gap:7px;}
+.chip{border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:12px;color:var(--muted);background:#fff;}
+.chip:hover{border-color:var(--accent);color:var(--accent);}
+.subnav{display:flex;gap:16px;border-bottom:1px solid var(--line);margin-bottom:16px;}
+.subnav button{padding:0 0 8px;font-size:12.5px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.subnav button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:650;}
+@media(max-width:1040px){
+  .wrap{flex-direction:column;}
+  .queue{width:100%;position:static;}
+  .g2,.g3{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="wordmark">Vizier<i>4dev</i></div>
+  <div class="proj"><b>Cold Chain for Rural Clinics</b><span id="projline">€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period</span></div>
+  <div class="grow"></div>
+  <div class="cmd"><span class="small">?</span><input id="cmd" placeholder="Ask this programme anything…" onkeydown="if(event.key==='Enter')ask()"/><span class="k">↵</span></div>
+  <div class="seg" id="personas">
+    <button id="p-lead" class="active" onclick="setPersona('lead')">Lead</button>
+    <button id="p-partner" onclick="setPersona('partner')">Partner</button>
+    <button id="p-mel" onclick="setPersona('mel')">MEL reviewer</button>
+  </div>
+  <div class="seg"><button id="lang-en" onclick="setLang('en')">EN</button><button id="lang-ru" onclick="setLang('ru')">RU</button></div>
+  <button class="tbtn" id="b-tour" onclick="startTour()">Tour</button>
+  <button class="tbtn" id="b-reset" onclick="resetDemo()">Reset</button>
+</div>
+<div class="tabs" id="tabs"></div>
+
+<div class="wrap">
+  <div class="queue"><div class="qcard">
+    <div class="qhead"><b id="qtitle">What needs you</b><span class="grow"></span><span class="tag" id="qcount">0</span></div>
+    <div id="qlist"></div>
+  </div>
+  <div class="small" style="margin-top:9px" id="qnote">The queue is built from the donor’s rules and the current state of the reporting period. It changes with your role.</div>
+  </div>
+  <div class="surface" id="surface"></div>
+</div>
+
+<div id="toast" class="hidden"></div>
+<div id="coach" class="hidden"></div>
+
+<script>
+/* ==========================================================================
+   Vizier4Dev — single-file demo. Fictional programme, fictional figures.
+   Structure: six workspaces + a role-aware work queue + a command bar.
+   ========================================================================== */
+
+/* ------------------------------ sources -------------------------------- */
+const SRC={
+ call:{name:'Call for proposals — INTPA/TER/2025/04.pdf',type:'PDF',size:'1.1 MB',text:
+`EUROPEAN UNION — DG INTPA
+CALL FOR PROPOSALS INTPA/TER/2025/04
+Resilient primary health services — Terrace Province
+
+LOT 2: Immunisation cold chain and last-mile delivery.
+Indicative envelope: EUR 3,800,000 over 24 months.
+
+ELIGIBILITY
+Consortia of at least three partners, of which at least two nationally registered.
+A lead applicant assumes financial and narrative reporting responsibility.
+
+MANDATORY REQUIREMENTS
+A results framework with SMART indicators, baselines and targets.
+A functioning complaints and feedback mechanism accessible to end users.
+Disaggregated targeting and reporting for all person-level indicators.
+Safeguarding and child-protection policies in force at every partner.`},
+
+ prop:{name:'Cold Chain for Rural Clinics — full proposal.docx',type:'DOCX',size:'2.9 MB',text:
+`NORTHWIND ALLIANCE — FULL PROPOSAL
+Action: Cold Chain for Rural Clinics
+Lead applicant: Northwind Alliance
+Partners: Terrace Health Trust (THT), Riverbend Community Care (RCC), Summit Logistics Cooperative (SLC)
+
+OVERALL OBJECTIVE
+Vaccines reach every rural clinic in Terrace Province intact, on time and at a temperature that can be proven.
+
+SPECIFIC OBJECTIVES
+SO1 Cold chain equipment installed and maintained at 240 rural clinics.
+SO2 Last-mile delivery routes operating on a predictable schedule.
+SO3 Clinic staff trained and certified in cold chain handling.
+
+LOCALISATION
+54% of the budget is implemented by nationally registered partners.
+
+TRACK RECORD
+Previous action (2022-2024): 186 clinics equipped, 96% temperature-excursion detection rate,
+feedback mechanism response rate 91%.`},
+
+ logf:{name:'Results framework.xlsx',type:'XLSX',size:'420 KB',text:
+`RESULTS FRAMEWORK — COLD CHAIN FOR RURAL CLINICS
+
+OC1.1 - Vaccine potency at point of use
+  Baseline 82% · Target >=97% · Source: temperature-logger export + clinic audit
+
+OP1.1 - Clinics with functioning cold chain equipment
+  Baseline 0 · Target 240 · Lead: THT
+
+OP1.3 - Clinic maintenance teams operating
+  Baseline 0 · Target 18 teams · at least 40% female membership · Lead: THT
+
+OP2.1 - Deliveries completed within the scheduled window
+  Baseline - · Target 4,800 deliveries · Lead: SLC
+
+OC2.2 - Health workers reporting confidence in the cold chain
+  Baseline 38% · Target >=75% · perception survey, numerator and denominator required
+
+OP3.1 - Health workers trained and certified
+  Baseline - · Target 3,600 people · Lead: RCC/THT
+  DISAGGREGATE: sex, age band, disability
+
+CC1 - Feedback response rate
+  Baseline - · Target >=85% within 14 days · Lead: RCC
+
+CC2 - Inclusive reach of the feedback mechanism
+  Target: at least 40% of feedback from women and health workers with disability`},
+
+ budg:{name:'Budget and phasing.xlsx',type:'XLSX',size:'190 KB',text:
+`BUDGET BY HEADING (EUR)
+Cold chain equipment            1,102,000
+Last-mile transport & fuel        836,000
+Human resources                   798,000
+Training & certification          418,000
+Maintenance & spare parts         266,000
+MEL, audits and assessments       190,000
+Feedback mechanism & outreach     114,000
+Visibility and reporting           76,000
+
+QUARTERLY PHASING
+Q1 380,000 · Q2 532,000 · Q3 608,000 · Q4 570,000
+
+REPORTING RULE
+Explain any heading deviation above 10% in the narrative report.`},
+
+ guide:{name:'Donor reporting guidelines.pdf',type:'PDF',size:'760 KB',text:
+`REPORTING GUIDELINES — DG INTPA
+
+TIMING
+Partner -> Lead: quarterly, within 15 working days of quarter end.
+Lead -> Donor: quarterly consolidated report, within 30 working days.
+
+QUALITY BAR
+All "people" indicators MUST be disaggregated by sex, age band and disability.
+Report numerator AND denominator for every percentage. A bare percentage is rejected.
+Each figure must reference its means of verification, with evidence attached.
+Explain any heading deviation above 10%.
+The narrative report MUST contain a safeguarding subsection. A nil return is acceptable
+only if signed by the responsible officer.`},
+
+ rcclog:{name:'RCC Q1 training logs.xlsx',type:'XLSX',size:'96 KB',text:
+`RIVERBEND COMMUNITY CARE — Q1 TRAINING AND CERTIFICATION LOGS
+
+Certified health workers (consolidated, DEDUPLICATED): 812
+  Female 470 · Male 342 · Under-30 214 · Health workers with disability 61
+
+Session sign-in sheet raw total (NOT deduplicated): 1,140
+  ^ This total double-counts staff who attended more than one session.
+  The figure to report is the deduplicated certified count: 812.`},
+};
+
+/* ------------------------------ model ---------------------------------- */
+const INDICATORS=[
+ {code:'OC1.1',label:'Vaccine potency at point of use',unit:'%',base:'82',target:'≥97',lead:'THT',need:'Numerator + denominator + logger export',anchor:'OC1.1 - Vaccine potency at point of use'},
+ {code:'OP1.1',label:'Clinics with functioning equipment',unit:'clinics',base:'0',target:'240',lead:'THT',need:'Count + means of verification',anchor:'OP1.1 - Clinics with functioning cold chain equipment'},
+ {code:'OP1.3',label:'Clinic maintenance teams operating',unit:'teams',base:'0',target:'18',lead:'THT',need:'Count + % female membership (≥40%)',anchor:'OP1.3 - Clinic maintenance teams operating'},
+ {code:'OP2.1',label:'Deliveries inside the scheduled window',unit:'deliveries',base:'-',target:'4,800',lead:'SLC',need:'Count + dispatch records',anchor:'OP2.1 - Deliveries completed within the scheduled window'},
+ {code:'OC2.2',label:'Health workers confident in the cold chain',unit:'%',base:'38',target:'≥75',lead:'RCC',need:'Numerator + denominator + survey note',anchor:'OC2.2 - Health workers reporting confidence in the cold chain'},
+ {code:'OP3.1',label:'Health workers trained and certified',unit:'people',base:'-',target:'3,600',lead:'RCC/THT',need:'Disaggregate by sex / age / disability',anchor:'OP3.1 - Health workers trained and certified'},
+ {code:'CC1',label:'Feedback response rate',unit:'%',base:'-',target:'≥85',lead:'RCC',need:'Numerator + denominator + MoV',anchor:'CC1 - Feedback response rate'},
+];
+const RULES=[
+ {t:'Quarterly partner returns',d:'Within 15 working days of quarter end',anchor:'Partner -> Lead: quarterly'},
+ {t:'Disaggregation is mandatory',d:'Sex, age band and disability on every person-level indicator',anchor:'All "people" indicators MUST be disaggregated'},
+ {t:'No bare percentages',d:'Numerator and denominator required, or the figure is rejected',anchor:'Report numerator AND denominator'},
+ {t:'Evidence behind every figure',d:'Means of verification named and attached',anchor:'Each figure must reference its means of verification'},
+ {t:'Explain >10% budget deviation',d:'Per heading, inside the narrative report',anchor:'Explain any heading deviation above 10%'},
+ {t:'Safeguarding subsection',d:'Mandatory; a nil return must be signed',anchor:'The narrative report MUST contain a safeguarding subsection'},
+];
+const BUDGET=[
+ {h:'Cold chain equipment',b:1102000,q1p:132000,q1a:104000},
+ {h:'Last-mile transport & fuel',b:836000,q1p:96000,q1a:99000},
+ {h:'Human resources',b:798000,q1p:88000,q1a:86000},
+ {h:'Training & certification',b:418000,q1p:34000,q1a:38000},
+ {h:'Maintenance & spare parts',b:266000,q1p:14000,q1a:9000},
+ {h:'MEL, audits and assessments',b:190000,q1p:9000,q1a:8000},
+ {h:'Feedback mechanism & outreach',b:114000,q1p:5000,q1a:5000},
+ {h:'Visibility and reporting',b:76000,q1p:2000,q1a:2000},
+];
+/* Cost lines for the partner's Q1 financial return. `have` = evidence already on file.
+   Thresholds below are the programme's own procurement rule, carried from the grant agreement. */
+const PROC_THRESHOLD=10000;
+const PERIOD={from:'2026-01-01',to:'2026-03-31',label:'Q1 2026'};
+function defaultCosts(){return [
+ {id:'C-101',h:'Human resources',d:'MEL officer — 0.6 FTE, January to March',a:14200,t:'staff',date:'2026-03-31',link:'',have:['invoice','payroll']},
+ {id:'C-102',h:'Human resources',d:'Community mobilisers ×6 — Q1 field work',a:21800,t:'staff',date:'2026-03-31',link:'OP3.1',have:['invoice','payroll','timesheet'],mismatch:true},
+ {id:'C-103',h:'Training & certification',d:'Certification workshops ×14 — venue, catering, materials',a:18600,t:'procure',date:'2026-02-18',link:'OP3.1',have:['invoice','contract','quotes']},
+ {id:'C-104',h:'Cold chain equipment',d:'Spare parts and logger batteries — bulk order',a:12400,t:'procure',date:'2026-03-04',link:'OP1.3',have:['invoice']},
+ {id:'C-105',h:'Feedback mechanism & outreach',d:'Toll-free line and drop-in desk staffing',a:4900,t:'procure',date:'2026-02-27',link:'CC1',have:['invoice','contract']},
+ {id:'C-106',h:'Human resources',d:'Quarter-end performance bonus, project staff',a:3100,t:'bonus',date:'2026-03-31',link:'',have:['invoice','payroll']},
+ {id:'C-107',h:'Last-mile transport & fuel',d:'Fuel for the northern route, March',a:6300,t:'procure',date:'2026-04-06',link:'OP2.1',have:['invoice']},
+];}
+let COSTS=defaultCosts();
+const DOCNAMES={invoice:'Invoice & proof of payment',timesheet:'Signed timesheet',payroll:'Payroll record',contract:'Signed contract',quotes:'Comparison of offers'};
+/* Append-only record of who changed what — this is the audit trail the auditor asks for. */
+let LEDGER=[];
+function logEvent(what,detail){LEDGER.unshift({at:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),by:roleName(),what,detail});}
+
+/* Illustrative mapping targets. The live product loads the donor's current official list;
+   the labels below stand in for it and are not quoted as official codes. */
+const CORE_IND=[
+ {c:'CI-01',l:'People with access to essential health services'},
+ {c:'CI-02',l:'Health facilities equipped or rehabilitated'},
+ {c:'CI-03',l:'Health personnel trained (disaggregated)'},
+ {c:'CI-04',l:'Functioning accountability mechanisms in place'},
+ {c:'CI-05',l:'Deliveries completed to standard'},
+];
+let MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
+
+const ME='Riverbend Community Care';
+const PARTNERS=['Terrace Health Trust',ME,'Summit Logistics Cooperative'];
+const FTYPES={number:'Number',percent:'Percentage (n/d)',text:'Short text',longtext:'Narrative',select:'Choice',file:'Evidence file'};
+
+function defaultTemplate(){return{
+ name:'Quarterly partner return — Q1',status:'draft',
+ sections:[
+  {ind:'OP3.1',title:'Health workers trained and certified',why:'Donor rule: person-level indicators must be disaggregated by sex, age band and disability.',anchor:'All "people" indicators MUST be disaggregated',
+   fields:[{l:'Total certified (in-period)',t:'number',req:true},{l:'Female',t:'number',req:true},{l:'Male',t:'number',req:true},
+           {l:'Under-30',t:'number',req:true},{l:'Health workers with disability',t:'number',req:true},
+           {l:'Means of verification',t:'text',req:true},{l:'Evidence',t:'file',req:false}]},
+  {ind:'CC1',title:'Feedback response rate',why:'Donor rule: percentages need a numerator and a denominator.',anchor:'Report numerator AND denominator',
+   fields:[{l:'Answered within 14 days (numerator)',t:'number',req:true},{l:'Feedback items received (denominator)',t:'number',req:true},{l:'Means of verification',t:'text',req:true}]},
+  {ind:'OC2.2',title:'Health workers confident in the cold chain',why:'Perception survey — report numerator, denominator and what drives the gap.',anchor:'OC2.2 - Health workers reporting confidence in the cold chain',
+   fields:[{l:'Reporting confidence (numerator)',t:'number',req:true},{l:'Surveyed (denominator)',t:'number',req:true},{l:'Narrative / barriers noted',t:'longtext',req:false}]},
+  {ind:'OP1.3',title:'Clinic maintenance teams operating',why:'Count plus female membership share (target ≥40%).',anchor:'OP1.3 - Clinic maintenance teams operating',
+   fields:[{l:'Teams operating',t:'number',req:true},{l:'Female members (%)',t:'percent',req:true},{l:'Means of verification',t:'text',req:true}]},
+ ]};}
+
+const DRAFT={
+ 'OP3.1':{'Female':'470','Male':'342','Under-30':'214','Health workers with disability':'61','Means of verification':'Certification register + session sign-in sheets (Q1)'},
+ 'CC1':{'Answered within 14 days (numerator)':'163','Feedback items received (denominator)':'185','Means of verification':'Feedback log export (Q1)'},
+ 'OP1.3':{'Teams operating':'11','Female members (%)':'44','Means of verification':'Team rosters and maintenance logs (Q1)'},
+};
+const DRAFT_NOTE='Drafted from RCC’s Q1 training logs and feedback export. Verify every figure before you submit.';
+const CONFLICT={ind:'OP3.1',field:'Total certified (in-period)',options:[
+ {v:'812',note:'Deduplicated certification register',ok:true},
+ {v:'1,140',note:'Raw session sign-in total',ok:false}]};
+const NARR_EXPECT={ind:'OC2.2',words:['confiden','logger','training','fridge','power','outage','supervis','distance','spare','alarm','temperature'],
+ topic:'what actually drives confidence — power outages, logger alarms, spare parts, supervision'};
+
+const OTHER_SUB={
+ 'Terrace Health Trust':{'OP3.1':{'Total certified (in-period)':'1,240','Female':'690','Male':'550','Under-30':'318','Health workers with disability':'88','Means of verification':'Certification register (Q1)'},
+   'CC1':{'Answered within 14 days (numerator)':'171','Feedback items received (denominator)':'196','Means of verification':'Feedback log (Q1)'},
+   'OC2.2':{'Reporting confidence (numerator)':'402','Surveyed (denominator)':'700','Narrative / barriers noted':'Confidence is highest where a maintenance team visited in the last 60 days.'},
+   'OP1.3':{'Teams operating':'11','Female members (%)':'42','Means of verification':'Team rosters (Q1)'}},
+ 'Summit Logistics Cooperative':{'OP3.1':{'Total certified (in-period)':'604','Female':'318','Male':'286','Under-30':'150','Health workers with disability':'34','Means of verification':'Driver and handler training records (Q1)'},
+   'CC1':{'Answered within 14 days (numerator)':'149','Feedback items received (denominator)':'180','Means of verification':'Feedback log (Q1)'},
+   'OC2.2':{'Reporting confidence (numerator)':'268','Surveyed (denominator)':'420','Narrative / barriers noted':'Handlers cite fuel shortages on the northern route as the main risk to the window.'},
+   'OP1.3':{'Teams operating':'6','Female members (%)':'33','Means of verification':'Rosters (Q1)'}},
+};
+const AI_REVIEW={
+ 'Riverbend Community Care':[
+  {t:'Source conflict resolved',d:'OP3.1 was reconciled from two conflicting sources (812 vs 1,140). Confirm the sign-in sheet gets corrected so this does not recur next quarter.',sev:'warn'},
+  {t:'Thin narrative to watch',d:'OC2.2 has no substantive explanation. Ask RCC for the concrete barriers — outages, alarms, spare parts — and what was done about them.',sev:'warn'},
+  {t:'Strong feedback performance',d:'CC1 sits above the 85% target. Worth pulling into the donor narrative.',sev:'good'}],
+ 'Terrace Health Trust':[
+  {t:'Possible gap',d:'OP1.3 shows 11 of 18 teams operating. Ask THT for the timeline on the remaining seven in the northern districts.',sev:'warn'},
+  {t:'Consistent and evidenced',d:'Disaggregation reconciles and means of verification are named on every indicator.',sev:'good'}],
+ 'Summit Logistics Cooperative':[
+  {t:'Below the inclusion floor',d:'OP1.3 female membership is 33% against a 40% floor. Flag it before consolidation — the donor checks this line.',sev:'warn'},
+  {t:'Double-counting risk',d:'SLC and RCC both trained handlers in Terrace district. Verify deduplication across partners before consolidation.',sev:'warn'}],
+};
+
+function defaultNarr(){return{title:'Q1 narrative report — Cold Chain for Rural Clinics',status:'draft',_t:null,sections:[
+ {id:'exec',t:'1. Executive summary',g:'Key results, deviations and decisions this quarter, in plain language.',
+  v:'In Q1 the consortium equipped 96 clinics with functioning cold chain units, certified 2,656 health workers, and ran a feedback mechanism answering 86% of items within 14 days. Vaccine potency at point of use rose from 82% to 91% against a 97% target; maintenance team formation is behind schedule.',
+  flags:[],comments:[],attach:[],need:[]},
+ {id:'ctx',t:'2. Context update',g:'Changes in the operating environment affecting delivery: access, power supply, fuel, prices.',
+  v:'',flags:[{s:'red',content:true,m:'Empty — the donor requires a context update every reporting period.'}],comments:[],attach:[],
+  need:[{n:'Provincial power-outage bulletin',g:'Evidences the grid interruptions behind equipment downtime.'},{n:'Fuel price series (Q1)',g:'Supports any transport cost deviation you report.'}]},
+ {id:'o1',t:'3. Activities — Outcome 1 (Equipment and maintenance)',g:'What was delivered against each output, with evidence and disaggregated figures.',
+  v:'Ninety-six clinics received solar direct-drive refrigerators and temperature loggers; installation crews covered four districts.',
+  flags:[{s:'amber',evidence:true,m:'The 96-clinic figure has no attached evidence and no maintenance status.'}],comments:[],attach:[],
+  need:[{n:'Installation sign-off register',g:'Per-clinic sign-off is the means of verification named in the results framework.'},{n:'Temperature-logger export (Q1)',g:'Backs the potency claim in the executive summary.'}]},
+ {id:'cc',t:'4. Cross-cutting (feedback, gender, safeguarding, environment)',g:'Response rate, disaggregated results, safeguarding status (incidents or a signed nil return), environmental checks.',
+  v:'The feedback line handled items with an 86% response rate within 14 days.',
+  flags:[{s:'red',content:true,m:'Safeguarding subsection missing — mandatory. State incidents or a signed nil return.'},{s:'amber',evidence:true,m:'The share of feedback from women and health workers with disability is not reported (CC2).'}],
+  comments:[],attach:[],need:[{n:'Signed safeguarding nil return',g:'Must be signed by the responsible officer to be accepted.'},{n:'Feedback disaggregation export',g:'Gives the CC2 inclusion share the donor checks.'}]},
+ {id:'ch',t:'5. Challenges and adaptive measures',g:'Risks that materialised and how the team adapted.',
+  v:'Refrigerator shipments were delayed at the port; crews were redeployed to site preparation and training to avoid idle time.',
+  flags:[],comments:[],attach:[],need:[]},
+]};}
+const NARR_DRAFT={
+ ctx:'Grid interruptions in the northern districts averaged 6.4 hours per day in Q1, up from 4.1 in the previous quarter, which extended equipment commissioning times. Road access remained stable. Diesel prices rose 14%, raising last-mile transport costs against plan. No new security constraints were reported.',
+ o1:'Ninety-six clinics received solar direct-drive refrigerators and temperature loggers, verified against the per-clinic installation sign-off register. Eleven of eighteen maintenance teams are operating, covering 71 of the 96 equipped clinics; the remaining teams are blocked on spare-part procurement. Logger exports show vaccine potency at point of use rising from 82% to 91%.',
+ cc:'The feedback line handled 561 items across the consortium with an 86% response rate within 14 days; 34% came from women and health workers with disability against a 40% floor, prompting supervised drop-in desks at clinic level next quarter. Safeguarding: two low-level concerns were logged and closed under policy, and focal points are active at all four partners. Environmental: refrigerant disposal followed the provincial protocol and was documented for all 96 units.',
+};
+
+const LEARNING_Q=[
+ 'Which maintenance arrangements keep cold chain equipment running after installation?',
+ 'What makes health workers trust the cold chain enough to change practice?',
+ 'Does the feedback mechanism reach women and health workers with disability?',
+];
+const FINDINGS=[
+ {lq:'LQ1',q:'Which maintenance arrangements sustain equipment?',
+  finding:'Clinics covered by a maintenance team within 60 days report 34% fewer equipment failures. Only 11 of the 18 planned teams are operating.',
+  action:'Stand up the remaining seven teams in the northern districts; copy the Terrace roster model that hit 42% female membership.',
+  conf:'Medium',src:[['logf','OP1.3 - Clinic maintenance teams operating']],check:true},
+ {lq:'LQ2',q:'What drives confidence in the cold chain?',
+  finding:'Confidence tracks visible alarm response, not training hours. Sites where a logger alarm produced a same-day visit show the highest confidence scores — an early but consistent signal.',
+  action:'Publish alarm response times per district next quarter and compare against confidence scores.',
+  conf:'Low — early signal',src:[['logf','OC2.2 - Health workers reporting confidence in the cold chain']],check:true},
+ {lq:'LQ3',q:'Does the feedback mechanism reach everyone?',
+  finding:'86% of feedback is answered within 14 days, but only 34% comes from women and health workers with disability against a 40% floor. The channel mix likely excludes them.',
+  action:'Add supervised drop-in desks and a voice channel; review the inclusion share in six weeks.',
+  conf:'High',src:[['logf','CC2 - Inclusive reach of the feedback mechanism']],check:false},
+];
+
+const OPPS=[
+ {t:'Immunisation supply chain — second phase',donor:'EU / DG INTPA',fit:91,deadline:'in 21 days',why:['direct continuation of this action','existing INTPA track record','presence in the target province'],gap:''},
+ {t:'Health workforce certification at scale',donor:'Gavi',fit:76,deadline:'in 34 days',why:['3,600-worker certification pipeline','partner-led delivery'],gap:'no prior Gavi contract'},
+ {t:'Off-grid energy for health facilities',donor:'FCDO',fit:62,deadline:'in 11 days',why:['solar direct-drive experience'],gap:'no energy-sector lead; tight deadline'},
+];
+const PROP_REVIEW={fit:74,
+ strengths:['Proven delivery record — 186 clinics equipped in the previous action','Genuine localisation: 54% partner-led','Feedback mechanism running at a 91% response rate'],
+ gaps:['Maintenance cost-recovery beyond the action is thin','The theory of change does not map cleanly onto the donor’s outcome wording','No cost-per-clinic efficiency figures'],
+ asks:['Attach the final report of the previous action (found 1: Terrace Cold Chain 2022-2024)','Attach 2 capability statements','Attach an audited financial summary'],
+};
+
+const QA=[
+ {q:'What is our cost per clinic equipped this quarter?',
+  a:'Q1 equipment spend was <b>€104,000</b> across <b>96 clinics</b> — an interim <b>≈€1,083 per clinic</b>. Unit cost should fall as crews stop travelling between districts for small batches.',
+  src:[['budg','Cold chain equipment'],['logf','OP1.1 - Clinics with functioning cold chain equipment']]},
+ {q:'Which partner is behind on spending?',
+  a:'<b>Terrace Health Trust</b> — 21% under the Q1 equipment phasing, a projected <b>≈€78,000</b> underspend by mid-year, driven by refrigerators held at the port.',
+  src:[['budg','QUARTERLY PHASING'],['budg','Cold chain equipment']]},
+ {q:'Summarise Q1 in three bullets for the donor.',
+  a:'• 96 clinics equipped and commissioned, with per-clinic sign-off.<br>• 2,656 health workers certified, fully disaggregated.<br>• Potency at point of use up from 82% to 91% against a 97% target; maintenance team formation behind schedule.',
+  src:[['logf','OP1.1 - Clinics with functioning cold chain equipment'],['logf','OP3.1 - Health workers trained and certified']]},
+ {q:'Are we meeting the disaggregation rule?',
+  a:'Yes. Every person-level indicator submitted this quarter carries sex, age band and disability breakdowns. Vizier blocks submission of a person-level indicator without them.',
+  src:[['guide','All "people" indicators MUST be disaggregated']]},
+ {q:'What is missing in the narrative report?',
+  a:'Two sections: <b>Context update</b> is empty (required), and <b>Cross-cutting</b> has no safeguarding subsection and no CC2 inclusion share. Both have a draft ready and evidence to attach.',
+  src:[['guide','The narrative report MUST contain a safeguarding subsection']]},
+ {q:'What needs my approval right now?',
+  a:'Your queue on the left is the answer: it is rebuilt from the donor rules and the state of the period every time anything changes.',
+  src:[['guide','QUALITY BAR']]},
+];
+
+/* ------------------------------ state ---------------------------------- */
+let TPL=defaultTemplate(), NARRATIVE=defaultNarr();
+let SUB={}, VERIFY={}, COMMENTS={}, APPROVED={};
+let LQS=[...LEARNING_Q], PLQ=['How is the alarm-response routine landing with clinic staff?'], PIPELINE=[];
+const S={persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
+         consolidated:false,reviewTarget:'',propReviewed:false,curFit:PROP_REVIEW.fit};
+
+const WS=[
+ {id:'sources',label:'Sources'},
+ {id:'framework',label:'Framework'},
+ {id:'collect',label:'Collection'},
+ {id:'report',label:'Reporting'},
+ {id:'signals',label:'Signals'},
+ {id:'funding',label:'Funding'},
+];
+const SUBNAV={
+ framework:[['model','What the donor demands'],['template','What we collect']],
+ collect:[['returns','Results'],['costs','Costs'],['review','Returns in review']],
+ report:[['narrative','Narrative'],['financial','Financial & audit'],['consolidated','Consolidated report']],
+ signals:[['control','Control room'],['learning','Learning']],
+};
+
+/* ------------------------------ helpers -------------------------------- */
+function esc(s){return (s+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function attr(s){return esc(s).replace(/'/g,'&#39;');}
+function eur(n){return '€'+n.toLocaleString('en-GB');}
+function fmt(n){return n.toLocaleString('en-GB');}
+function num(x){return parseInt((x||'').toString().replace(/[^0-9]/g,''))||0;}
+function can(a){return S.persona!=='partner';}
+function roleName(){return S.persona==='partner'?'Riverbend (partner)':S.persona==='mel'?'MEL reviewer':'Consortium lead';}
+function toast(m){const t=document.getElementById('toast');t.innerHTML=localize('>'+m+'<').slice(1,-1);t.classList.remove('hidden');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.add('hidden'),3200);}
+function head(t,s){return `<div class="pagehead"><h1 class="page">${t}</h1>${s?`<p class="page-sub">${s}</p>`:''}</div>`;}
+function panel(i,c=''){return `<div class="panel ${c}">${i}</div>`;}
+function locked(m,ws,sub,label){return `<div class="locked">${m}</div>`+(ws?`<button class="btn" onclick="go('${ws}'${sub?",'"+sub+"'":''})">${label}</button>`:'');}
+function src(doc,anchor,label){return `<span class="src" onclick="openSource('${doc}','${attr(anchor||'')}')">${esc(label||SRC[doc].name)}</span>`;}
+function stat(k,v,s){return `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div><div class="s">${s||''}</div></div>`;}
+function insight(t,b,act){return `<div class="insight"><div class="h">${t}</div><div>${b}</div>${act?`<div style="margin-top:11px"><button class="btn sm" onclick="toast('Added to your actions for this quarter.')">${act}</button></div>`:''}</div>`;}
+function modal(html,w='560px'){const d=document.createElement('div');d.className='modal-wrap';d.onclick=e=>{if(e.target===d)d.remove();};
+ d.innerHTML=localize(`<div class="modal" style="max-width:${w}">${html}<div style="text-align:right;margin-top:16px"><button class="btn" onclick="this.closest('.modal-wrap').remove()">Close</button></div></div>`);
+ document.body.appendChild(d);return d;}
+function openSource(docId,anchor){
+ const d=SRC[docId];if(!d)return;let body=esc(d.text);
+ if(anchor){const a=esc(anchor);const i=body.indexOf(a);if(i>=0)body=body.slice(0,i)+'<mark id="hl">'+body.slice(i,i+a.length)+'</mark>'+body.slice(i+a.length);}
+ modal(`<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span class="tag">${d.type}</span><b>${esc(d.name)}</b></div>
+  <div class="doc-body">${body}</div><div class="small" style="margin-top:8px">In the live product this opens the original file at the highlighted line.</div>`,'760px');
+ setTimeout(()=>{const h=document.getElementById('hl');if(h)h.scrollIntoView({block:'center'});},60);
+}
+
+/* ------------------------------ work queue ------------------------------ */
+function queue(){
+ const q=[];
+ const add=(sev,t,d,ws,sub)=>q.push({sev,t,d,ws,sub});
+ if(!S.ingested){add('blue','Add the project documents','Nothing is indexed yet — the queue stays empty until it can read the rules.','sources');return q;}
+ if(TPL.status!=='active'&&can()) add('blue','Approve the reporting template','Partners cannot file until the template is live.','framework','template');
+ if(S.persona==='partner'){
+  if(TPL.status!=='active') add('amber','Waiting on the lead','The Q1 template has not been activated yet.','framework','template');
+  else{
+   if(!S.conflictDone) add('red','Two of your sources disagree','OP3.1 total: 812 in the register against 1,140 on the sign-in sheets.','collect','returns');
+   const v=validate(), reds=v.filter(f=>f.sev==='red'), ambers=v.filter(f=>f.sev==='amber');
+   if(reds.length>3) add('red',reds.length+' required figures still empty','Draft from your files first, then fix what is left by hand.','collect','returns');
+   else reds.forEach(f=>add('red',f.field,f.msg,'collect','returns'));
+   ambers.slice(0,3).forEach(f=>add('amber',f.field,f.msg,'collect','returns'));
+   if(!S.submitted&&!v.length) add('green','Your return is ready to submit','All donor checks pass.','collect','returns');
+   const risky=COSTS.filter(c=>costFlags(c).some(x=>x.sev==='red'));
+   if(risky.length>3) add('red',eur(risky.reduce((a,c)=>a+c.a,0))+' of costs at risk',risky.length+' lines are missing the evidence an auditor asks for.','collect','costs');
+   else risky.forEach(c=>add('red',c.id+' — '+eur(c.a)+' at risk',costFlags(c).find(x=>x.sev==='red').m,'collect','costs'));
+  }
+ }else{
+  if(TPL.status==='active'){
+   PARTNERS.forEach(p=>{if(!APPROVED[p]) add('amber','Review '+p,(AI_REVIEW[p]||[]).filter(i=>i.sev!=='good').length+' point(s) worth a human decision.','collect','review');});
+   if(PARTNERS.every(p=>APPROVED[p])&&!S.consolidated) add('blue','Consolidate the Q1 report','All three returns are approved.','report','consolidated');
+   const t=costTotals();
+   if(t.atRisk) add('red',eur(t.atRisk)+' would not survive an audit',COSTS.filter(c=>costFlags(c).some(x=>x.sev==='red')).length+' cost line(s) with a blocking evidence gap.','report','financial');
+   const unmapped=Object.entries(MAPPING).filter(([k,v])=>!v).length;
+   if(S.consolidated&&unmapped) add('amber',unmapped+' indicators not mapped for the donor system','The results system will not accept an unmapped indicator.','report','consolidated');
+  }
+  NARRATIVE.sections.forEach(s=>{const r=s.flags.filter(f=>f.s==='red');
+   if(r.length) add('red',s.t.replace(/^\d+\.\s*/,''),r[0].m,'report','narrative');});
+ }
+ add('amber','INTPA second phase closes in 21 days','Fit 91% — the strongest match in your pipeline.','funding');
+ return q;
+}
+function renderQueue(){
+ const q=queue();
+ document.getElementById('qcount').textContent=q.length;
+ document.getElementById('qlist').innerHTML=localize(q.length?q.map((i,ix)=>`<button class="qitem" onclick="go('${i.ws}'${i.sub?",'"+i.sub+"'":''})">
+   <div class="t"><span class="dot ${i.sev}"></span><span>${esc(i.t)}</span></div><div class="d">${esc(i.d)}</div></button>`).join('')
+  :'<div class="qempty">Nothing needs you in this period. The queue refills as partners file and the donor deadline approaches.</div>');
+}
+
+/* ------------------------------ language -------------------------------- */
+/* What Vizier says to you is translated. What comes out of the donor's own
+   documents — indicator codes and labels, form field labels, file contents,
+   budget headings, partner names — stays in the donor's language, because that
+   is what gets submitted and what an auditor reads. */
+let LANG=(localStorage.getItem('v4d_lang')||((navigator.language||'en').slice(0,2)==='ru'?'ru':'en'));
+const DICT={
+"Lead":"Ведущая","Partner":"Партнёр","MEL reviewer":"MEL-ревьюер","Tour":"Тур","Reset":"Сброс",
+"Sources":"Источники","Framework":"Рамка","Collection":"Сбор","Reporting":"Отчётность","Signals":"Сигналы","Funding":"Финансирование",
+"Nothing needs you in this period. The queue refills as partners file and the donor deadline approaches.":"Сейчас от вас ничего не требуется. Очередь наполнится, когда партнёры начнут сдавать и приблизится срок донора.",
+"Add the project documents":"Загрузите документы проекта",
+"Nothing is indexed yet — the queue stays empty until it can read the rules.":"Пока ничего не проиндексировано — очередь пуста, пока нечего читать.",
+"Approve the reporting template":"Утвердите форму отчётности","Partners cannot file until the template is live.":"Пока форма не активна, партнёры не могут сдавать.",
+"Waiting on the lead":"Ждём ведущую организацию","The Q1 template has not been activated yet.":"Форма за Q1 ещё не активирована.",
+"Two of your sources disagree":"Два ваших источника расходятся",
+"OP3.1 total: 812 in the register against 1,140 on the sign-in sheets.":"OP3.1, итог: 812 в реестре против 1 140 в листах регистрации.",
+"Your return is ready to submit":"Отчёт готов к сдаче","All donor checks pass.":"Все проверки донора пройдены.",
+"Draft from your files first, then fix what is left by hand.":"Сначала соберите черновик из своих файлов, остальное поправьте руками.",
+"All three returns are approved.":"Все три отчёта одобрены.","Consolidate the Q1 report":"Сведите отчёт за Q1",
+"The results system will not accept an unmapped indicator.":"Система результатов не примет несопоставленный показатель.",
+"INTPA second phase closes in 21 days":"Второй этап INTPA закрывается через 21 день",
+"Fit 91% — the strongest match in your pipeline.":"Соответствие 91% — лучшее совпадение в вашей воронке.",
+"Drop in the documents that already govern this programme. Vizier reads them as they are — no template to fill in first.":"Загрузите документы, которые уже управляют этой программой. Vizier прочитает их как есть — заранее заполнять ничего не нужно.",
+"Drop the project documents here":"Перетащите сюда документы проекта",
+"Call · proposal · results framework · budget · donor guidelines · partner logs":"Конкурс · заявка · рамка результатов · бюджет · правила донора · журналы партнёра",
+"Load the demo set":"Загрузить демонстрационный комплект","Reading your documents…":"Читаю ваши документы…",
+"What happens to them":"Что с ними происходит","Read":"Читает","Bind":"Связывает","Trace":"Прослеживает",
+"Indicators, baselines, targets, budget headings, deadlines and the donor’s reporting rules.":"Показатели, базовые значения, цели, статьи бюджета, сроки и правила отчётности донора.",
+"Each rule is bound to the field it will police, so a bad figure cannot enter the record.":"Каждое правило привязано к полю, которое оно контролирует, поэтому негодная цифра в отчёт не попадёт.",
+"Every number keeps a line back to the file and the row it came from.":"У каждой цифры сохраняется путь к файлу и строке, откуда она взята.",
+"Six files indexed. Click any of them to open at the exact line Vizier used.":"Проиндексировано шесть файлов. Откройте любой на той самой строке, которую использовал Vizier.",
+"Indexed files":"Проиндексированные файлы","bound":"связан","Extraction":"Извлечено",
+"indicators with targets":"показателей с целями","budget headings":"статей бюджета","rules now enforced":"правил теперь контролируются",
+"Nothing was re-keyed. From here the rules do the work: they build the collection form, police every figure, and fill the queue on the left.":"Ничего не перенабиралось. Дальше работают правила: они строят форму сбора, контролируют каждую цифру и наполняют очередь слева.",
+"Open the framework →":"Открыть рамку →","What the donor demands":"Что требует донор","What we collect":"Что мы собираем",
+"The obligations Vizier extracted, and what each one needs before a figure counts as reportable.":"Обязательства, которые извлёк Vizier, и что нужно каждому, прежде чем цифру можно сдавать.",
+"budget":"бюджет","rules enforced":"правил контролируются","Indicators":"Показатели","Code":"Код","Indicator":"Показатель",
+"Base":"База","Target":"Цель","What it needs":"Что требуется","Source":"Источник","framework":"рамка","guidelines":"правила",
+"Rules bound to fields":"Правила, привязанные к полям","Budget and Q1 phasing":"Бюджет и разбивка по Q1",
+"Heading":"Статья","Q1 plan":"План Q1","Q1 actual":"Факт Q1","Variance":"Отклонение","Budget":"Бюджет","budget rule":"правило бюджета",
+"Quarterly partner returns":"Ежеквартальные отчёты партнёров","Within 15 working days of quarter end":"В течение 15 рабочих дней после конца квартала",
+"Disaggregation is mandatory":"Дизагрегация обязательна","Sex, age band and disability on every person-level indicator":"Пол, возрастная группа и инвалидность по каждому показателю о людях",
+"No bare percentages":"Никаких голых процентов","Numerator and denominator required, or the figure is rejected":"Нужны числитель и знаменатель, иначе цифру отклонят",
+"Evidence behind every figure":"Подтверждение за каждой цифрой","Means of verification named and attached":"Способ проверки назван и приложен",
+"Explain >10% budget deviation":"Объяснять отклонение бюджета выше 10%","Per heading, inside the narrative report":"По каждой статье, в тексте отчёта",
+"Safeguarding subsection":"Подраздел о защите","Mandatory; a nil return must be signed":"Обязателен; подтверждение отсутствия случаев должно быть подписано",
+"Generated from the rules on the left-hand tab. Edit it like a document — every field carries the obligation it exists for.":"Сгенерировано из правил на соседней вкладке. Правьте как документ — каждое поле несёт обязательство, ради которого существует.",
+"Viewing as a partner: the collection form is read-only until the lead activates it.":"Вы смотрите как партнёр: форма доступна только для чтения, пока ведущая организация её не активирует.",
+"Form":"Форма","draft":"черновик","live to partners":"открыта партнёрам","Active":"Активна",
+"Add indicator":"Добавить показатель","Activate for partners":"Активировать для партнёров","Add field":"Добавить поле",
+"required":"обязательное","optional":"необязательное","rule":"правило","Section added.":"Раздел добавлен.",
+"Number":"Число","Percentage (n/d)":"Процент (числ./знам.)","Short text":"Короткий текст","Narrative":"Текст","Choice":"Выбор","Evidence file":"Файл подтверждения",
+"Results":"Результаты","Costs":"Расходы","Returns in review":"Отчёты на проверке",
+"Your figures are checked against the donor rules and against your own source files as you type.":"Ваши цифры проверяются по правилам донора и по вашим же исходным файлам прямо при вводе.",
+"Status":"Статус","Draft — due in 6 working days":"Черновик — срок через 6 рабочих дней","Submitted — with the reviewer":"Сдан — у ревьюера",
+"Draft from my files":"Собрать из моих файлов","Submit":"Сдать","From your reviewer":"От вашего ревьюера",
+"Drafted from RCC’s Q1 training logs and feedback export. Verify every figure before you submit.":"Собрано из журналов обучения RCC за Q1 и выгрузки обратной связи. Проверьте каждую цифру перед сдачей.",
+"clean":"чисто","Required by the donor form.":"Обязательно по форме донора.","Unresolved source conflict.":"Конфликт источников не разрешён.",
+"Numerator is larger than the denominator.":"Числитель больше знаменателя.","Attach evidence":"Приложить подтверждение",
+"Below the 40% floor in the results framework.":"Ниже порога в 40%, заданного рамкой результатов.",
+"Too short to be usable in the donor report.":"Слишком коротко, чтобы использовать в отчёте донору.",
+"matches your Q1 source file":"совпадает с вашим исходным файлом за Q1",
+"could not verify against a source — confirm it":"не удалось сверить с источником — подтвердите",
+"Both figures sit in your own files":"Обе цифры лежат в ваших собственных файлах",
+". Pick the one to report; the choice is recorded with its reason.":". Выберите ту, которую сдаём; выбор запишется вместе с причиной.",
+"Deduplicated certification register":"Реестр сертификации без повторов","recommended — deduplicated":"рекомендуется — без повторов",
+"Raw session sign-in total":"Сырой итог по листам регистрации","double-counts repeat attendance":"дважды считает повторные посещения",
+"Results tell the donor what happened; these lines are what gets audited. Each rule below is a documented reason costs are declared ineligible and clawed back.":"Результаты говорят донору, что произошло; аудит проверяет эти строки. Каждое правило ниже — задокументированная причина, по которой расходы признают неприемлемыми и требуют вернуть.",
+"Declared this period":"Заявлено за период","At risk of rejection":"Под риском отклонения","Audit-ready":"Готово к аудиту",
+"blocking evidence gaps":"блокирующие пробелы в подтверждениях","nothing blocking":"ничего блокирующего",
+"complete evidence, linked to an output":"подтверждения полные, привязка к результату есть",
+"at risk":"под риском","to tidy":"привести в порядок","audit-ready":"готово к аудиту",
+"Invoice & proof of payment":"Счёт и подтверждение оплаты","Signed timesheet":"Подписанный табель","Payroll record":"Расчётный лист",
+"Signed contract":"Подписанный договор","Comparison of offers":"Сравнение предложений",
+"No invoice or proof of payment on file.":"Нет счёта или подтверждения оплаты.",
+"Personnel cost with no signed timesheet — the most frequent reason personnel costs are declared ineligible.":"Расход на персонал без подписанного табеля — самая частая причина, по которой такие расходы признают неприемлемыми.",
+"Timesheet hours do not reconcile with the payroll record for the same month.":"Часы в табеле не сходятся с расчётным листом за тот же месяц.",
+"No payroll record to support the declared salary cost.":"Нет расчётного листа, подтверждающего заявленную зарплату.",
+"A bonus linked solely to the funded action is not an eligible cost. Move it off the grant.":"Премия, привязанная только к финансируемому действию, — неприемлемый расход. Снимите её с гранта.",
+"Not linked to an output. An auditor will ask why this cost was necessary for the action.":"Нет привязки к результату. Аудитор спросит, зачем этот расход был нужен действию.",
+"Link to an output":"Привязать к результату","Take off the claim":"Снять с претензии",
+"Audit trail":"След для аудита",
+"Append-only. This is what an auditor asks for when a figure changes after submission.":"Только на добавление. Именно это спрашивает аудитор, когда цифра меняется после сдачи.",
+"Nothing recorded yet. Every attachment, link and removal from the claim lands here with the person and the time.":"Пока пусто. Каждое приложение документа, привязка и снятие с претензии попадут сюда с именем и временем.",
+"Empty. Every change to a figure or a document after submission is recorded here with the person and the time.":"Пусто. Любое изменение цифры или документа после сдачи фиксируется здесь с именем и временем.",
+"Three returns, already checked against the donor rules. What is left is judgement, not arithmetic.":"Три отчёта, уже проверенных по правилам донора. Осталось суждение, а не арифметика.",
+"Consolidate the donor report":"Свести отчёт донору","awaiting review":"ждёт проверки","approved":"одобрен","Open":"Открыть","Approve":"Одобрить",
+"Submitted · all indicators complete":"Сдан · все показатели заполнены","Submitted · 1 inclusion flag":"Сдан · 1 замечание по инклюзии","Not submitted yet":"Пока не сдан",
+"Every figure carries its source. A comment on any line lands inside the partner’s own form.":"У каждой цифры есть источник. Комментарий к любой строке попадёт прямо в форму партнёра.",
+"← All returns":"← Все отчёты","Comment":"Комментарий","missing":"нет данных","Send comments":"Отправить комментарии","Approve this return":"Одобрить этот отчёт",
+"Narrative report":"Текстовый отчёт","Report":"Отчёт",
+"Drafted from the same data the figures come from. Everyone edits here; only the lead approves.":"Составлен из тех же данных, откуда взяты цифры. Правят все, одобряет только ведущая организация.",
+"Approve the report":"Одобрить отчёт",
+"Drop a document into a section and Vizier pulls the relevant facts in, then names what evidence is still missing.":"Бросьте документ в раздел — Vizier вытащит нужные факты и назовёт, каких подтверждений ещё не хватает.",
+"Evidence still needed":"Каких подтверждений не хватает","Attach":"Приложить","Draft this section":"Составить этот раздел","Re-check":"Перепроверить","Approve section":"Одобрить раздел",
+"Empty — this section is required by the donor.":"Пусто — этот раздел обязателен по правилам донора.",
+"Empty — the donor requires a context update every reporting period.":"Пусто — донор требует обновление контекста в каждом отчётном периоде.",
+"Reads thin — add specifics, figures and the evidence behind them.":"Читается пусто — добавьте конкретику, цифры и подтверждения за ними.",
+"Safeguarding subsection missing — mandatory.":"Нет подраздела о защите — он обязателен.",
+"Safeguarding subsection missing — mandatory. State incidents or a signed nil return.":"Нет подраздела о защите — он обязателен. Укажите случаи или подписанное подтверждение их отсутствия.",
+"Financial report and audit readiness":"Финансовый отчёт и готовность к аудиту",
+"What the donor sees, and what an auditor would find. The second number is the one that costs money.":"Что видит донор и что нашёл бы аудитор. Денег стоит вторая цифра.",
+"Q1 expenditure":"Расход за Q1","Exposure if audited today":"Под ударом при проверке сегодня","Headings to explain":"Статей требуют объяснения",
+"cost lines with a blocking evidence gap":"строк расходов с блокирующим пробелом","deviation above 10%":"отклонение больше 10%",
+"By heading":"По статьям","Explanation":"Объяснение","Explain in the narrative":"Объяснить в тексте отчёта","not required":"не требуется",
+"The 10% rule comes from the grant agreement":"Правило 10% взято из грантового соглашения",
+"Audit exposure":"Что под ударом при аудите",
+"Cost lines that would not survive a check today, with the finding an auditor would write.":"Строки расходов, которые не пережили бы проверку сегодня, с формулировкой, которую написал бы аудитор.",
+"No blocking gaps. Every declared cost carries its evidence and an output.":"Блокирующих пробелов нет. У каждого заявленного расхода есть подтверждение и привязка к результату.",
+"Open the cost lines":"Открыть строки расходов","Assemble the audit pack":"Собрать папку для аудитора",
+"Q1 consolidated report":"Сводный отчёт за Q1",
+"Assembled from the three approved returns and the narrative. Every figure keeps its line back to a source.":"Собран из трёх одобренных отчётов и текстовой части. У каждой цифры сохранён путь к источнику.",
+"Hand it to the donor":"Передача донору",
+"Donors do not take a document any more — they take an encoded logframe in their own results system, or a structured interim form. Vizier assembles both from the same approved figures.":"Доноры больше не принимают документ — они принимают закодированную логфрейм-таблицу в своей системе результатов или структурированную промежуточную форму. Vizier собирает обе из одних и тех же одобренных цифр.",
+"Encode for the donor results system":"Закодировать для системы результатов донора",
+"Assemble the structured interim form":"Собрать структурированную промежуточную форму",
+"Our indicator":"Наш показатель","Q1 value":"Значение за Q1","Donor core indicator":"Основной показатель донора","— not mapped —":"— не сопоставлен —",
+"The donor accepts indicators only against its own core list, so every project indicator has to be mapped before the logframe can be encoded.":"Донор принимает показатели только по своему основному списку, поэтому каждый показатель проекта надо сопоставить до кодирования.",
+"ready to encode":"готово к кодированию",
+"All indicators carry a core-list target and a value with its source.":"У всех показателей есть цель из основного списка и значение с источником.",
+"The system rejects a submission with an unmapped indicator. Map them, or mark them as project-specific.":"Система отклонит сдачу с несопоставленным показателем. Сопоставьте их или пометьте как специфичные для проекта.",
+"Assembled from what is already approved. Sub-chapters marked [INT] are the ones the interim report adds on top of the original proposal; the rest travels unchanged.":"Собрано из того, что уже одобрено. Подразделы с пометкой [INT] промежуточный отчёт добавляет поверх исходной заявки, остальное переносится без изменений.",
+"filled":"заполнено","gap":"пробел","Save as draft":"Сохранить черновик",
+"The form can be saved as a draft, but not submitted until these are closed.":"Форму можно сохранить как черновик, но не сдать, пока это не закрыто.",
+"Every sub-chapter has content and evidence behind it.":"У каждого подраздела есть содержание и подтверждения.",
+"Description of the action":"Описание действия","carried from the proposal, locked":"перенесено из заявки, не редактируется",
+"Context update [INT]":"Обновление контекста [INT]","from narrative section 2":"из раздела 2 текстовой части",
+"Results achieved against the logframe [INT]":"Достигнутые результаты по логфрейму [INT]","from the three approved returns":"из трёх одобренных отчётов",
+"Beneficiaries reached, disaggregated [INT]":"Охваченные люди, с дизагрегацией [INT]","from OP3.1, sex / age / disability":"из OP3.1: пол / возраст / инвалидность",
+"Accountability, safeguarding and cross-cutting [INT]":"Подотчётность, защита и сквозные темы [INT]","from narrative section 4":"из раздела 4 текстовой части",
+"Financial overview [INT]":"Финансовый обзор [INT]","expenditure by heading, deviations above 10% explained":"расход по статьям, отклонения выше 10% объяснены",
+"Annexes and means of verification":"Приложения и способы проверки","evidence attached to each figure":"подтверждение приложено к каждой цифре",
+"Control room":"Пульт","Learning":"Обучение",
+"The programme while you can still change it, not a post-mortem next March.":"Программа, пока её ещё можно изменить, а не разбор в марте следующего года.",
+"Q1 spend against plan":"Расход Q1 к плану","Health workers certified":"Медработников сертифицировано","Partners reporting":"Партнёров отчитались","on time":"в срок",
+"74% of the Q1 milestone":"74% от вехи за Q1","Spend against plan":"Расход к плану","planned":"план","actual":"факт",
+"Indicator progress":"Прогресс по показателям","(% of full target)":"(% от полной цели)",
+"Underspend risk":"Риск недорасхода","Indicator lagging":"Показатель отстаёт","Add to my actions":"Добавить в мои задачи",
+"Export and connect":"Выгрузка и интеграции","Programme data leaves the way it came in.":"Данные программы уходят так же свободно, как пришли.",
+"Portfolio":"Портфель","preview":"предпросмотр","What this looks like":"Как это выглядит",
+"This organisation runs seven actions. A roll-up links shared indicators, repeated partners and lessons that transfer.":"У организации семь действий. Сводка связывает общие показатели, повторяющихся партнёров и уроки, которые переносятся.",
+"Portfolio roll-up":"Сводка по портфелю","Preview only in this demo.":"В демо только предпросмотр.",
+"The questions you actually want answered, kept beside the evidence that answers them.":"Вопросы, на которые вы правда хотите ответа, рядом с доказательствами, которые на них отвечают.",
+"Learning questions":"Вопросы для обучения",
+"Edit these and Vizier re-checks every return and dataset against them.":"Измените их — и Vizier перепроверит по ним каждый отчёт и набор данных.",
+"Add question":"Добавить вопрос","Add":"Добавить","This quarter’s open question":"Открытый вопрос квартала",
+"Generate the learning document":"Сформировать документ с уроками","Suggested action.":"Предлагаемое действие.","source":"источник",
+"needs one more data point":"нужен ещё один факт","confidence: High":"уверенность: высокая","confidence: Medium":"уверенность: средняя",
+"confidence: Low — early signal":"уверенность: низкая — ранний сигнал",
+"What this consortium’s delivery record already qualifies it for — matched on evidence, not keywords.":"На что уже даёт право послужной список консорциума — подбор по доказательствам, а не по ключевым словам.",
+"Open calls":"Открытые конкурсы","fit":"соответствие","Track":"Следить","Tracked":"В работе","Draft proposal review":"Разбор черновика заявки",
+"Vizier reads a draft against the call and against what this consortium can actually evidence.":"Vizier читает черновик против условий конкурса и против того, что консорциум реально может подтвердить.",
+"Review our INTPA second-phase draft":"Разобрать наш черновик по второму этапу INTPA",
+"fit against the call":"соответствие условиям конкурса","Evidenced strengths":"Подтверждённые сильные стороны",
+"Gaps a reviewer will find":"Пробелы, которые найдёт эксперт","What to attach":"Что приложить",
+"Question":"Вопрос","Try one of these":"Попробуйте один из этих",
+"Reading the returns, the framework and the budget…":"Читаю отчёты, рамку результатов и бюджет…",
+"Nothing in this programme answers that yet.":"В этой программе пока нет ответа на такой вопрос.",
+"Answered from this programme’s own documents and returns. If the data is not there, Vizier says so instead of guessing.":"Ответ собран из документов и отчётов самой программы. Если данных нет, Vizier скажет об этом, а не станет догадываться.",
+"Skip":"Пропустить","Next":"Далее","Finish":"Готово","Close":"Закрыть","Demo reset.":"Демо сброшено.",
+"In the live product this opens the original file at the highlighted line.":"В рабочем продукте здесь открывается исходный файл на подсвеченной строке.",
+"Demo preview. In the live product this compiles a formatted document for Word, PDF or your connected drive.":"Демо-предпросмотр. В рабочем продукте отсюда собирается готовый документ для Word, PDF или подключённого диска.",
+"Demo preview. In the live product this writes a folder: the cost ledger, every attached document, the trail of changes, and a cover note listing what is still missing.":"Демо-предпросмотр. В рабочем продукте отсюда пишется папка: реестр расходов, все приложенные документы, след изменений и записка с тем, чего не хватает.",
+"View as the partner":"Смотреть как партнёр","Partners see only their own return.":"Партнёры видят только свой отчёт.",
+"The lead has not activated the Q1 form yet.":"Ведущая организация ещё не активировала форму за Q1.",
+"The lead has not opened the Q1 period yet.":"Ведущая организация ещё не открыла период Q1.",
+"No sources indexed yet.":"Источники ещё не проиндексированы.","Go to sources":"К источникам","See the form":"К форме",
+"Approve the three returns, then consolidate.":"Одобрите три отчёта, затем сведите.","Go to review":"К проверке","Back to my return":"К моему отчёту",
+"Donor rule: person-level indicators must be disaggregated by sex, age band and disability.":"Правило донора: показатели о людях должны быть дизагрегированы по полу, возрастной группе и инвалидности.",
+"Donor rule: percentages need a numerator and a denominator.":"Правило донора: у процентов должны быть числитель и знаменатель.",
+"Perception survey — report numerator, denominator and what drives the gap.":"Опрос восприятия — укажите числитель, знаменатель и что стоит за разрывом.",
+"Count plus female membership share (target ≥40%).":"Количество плюс доля женщин в составе (цель ≥40%).",
+"Source conflict resolved.":"Конфликт источников разрешён.",
+"OP3.1 was reconciled from two conflicting sources (812 vs 1,140). Confirm the sign-in sheet gets corrected so this does not recur next quarter.":"OP3.1 сведён из двух расходящихся источников (812 против 1 140). Убедитесь, что лист регистрации исправят, иначе это повторится в следующем квартале.",
+"Thin narrative to watch.":"Слабый текст, за которым стоит следить.",
+"OC2.2 has no substantive explanation. Ask RCC for the concrete barriers — outages, alarms, spare parts — and what was done about them.":"По OC2.2 нет содержательного объяснения. Запросите у RCC конкретные барьеры — отключения, срабатывания сигнализации, запчасти — и что с ними сделали.",
+"Strong feedback performance.":"Сильный результат по обратной связи.",
+"CC1 sits above the 85% target. Worth pulling into the donor narrative.":"CC1 выше цели в 85%. Стоит вынести это в текст отчёта донору.",
+"Possible gap.":"Возможный пробел.",
+"OP1.3 shows 11 of 18 teams operating. Ask THT for the timeline on the remaining seven in the northern districts.":"По OP1.3 работают 11 бригад из 18. Запросите у THT сроки по оставшимся семи в северных районах.",
+"Consistent and evidenced.":"Согласовано и подтверждено.",
+"Disaggregation reconciles and means of verification are named on every indicator.":"Дизагрегация сходится, способ проверки назван по каждому показателю.",
+"Below the inclusion floor.":"Ниже порога по инклюзии.",
+"OP1.3 female membership is 33% against a 40% floor. Flag it before consolidation — the donor checks this line.":"По OP1.3 доля женщин 33% против порога в 40%. Отметьте это до сведения — донор проверяет эту строку.",
+"Double-counting risk.":"Риск двойного счёта.",
+"SLC and RCC both trained handlers in Terrace district. Verify deduplication across partners before consolidation.":"SLC и RCC обучали работников в одном районе Terrace. Проверьте исключение повторов между партнёрами до сведения.",
+"In the live product an organisation runs many actions in separate, access-controlled spaces. Authorised roles get a roll-up across them: the same indicator lagging in two actions, a partner appearing in four, a lesson from one that answers an open question in another.":"В рабочем продукте организация ведёт много действий в отдельных пространствах с разграниченным доступом. Уполномоченные роли получают сводку по ним: один и тот же показатель отстаёт в двух действиях, партнёр встречается в четырёх, урок из одного отвечает на открытый вопрос в другом.",
+"The donor accepts indicators only against its own core list, so every project indicator has to be mapped before the logframe can be encoded. The core list here is illustrative — the live product loads the donor’s current official one.":"Донор принимает показатели только по своему основному списку, поэтому каждый показатель проекта надо сопоставить до кодирования логфрейма. Список здесь иллюстративный — рабочий продукт загружает текущий официальный список донора."
+};
+const EVENTS={"Evidence attached":"Приложено подтверждение","Cost linked to an output":"Расход привязан к результату",
+"Cost removed from the claim":"Расход снят с претензии","Source conflict resolved":"Конфликт источников разрешён",
+"Return submitted":"Отчёт сдан","Return approved":"Отчёт одобрен","Indicator mapped":"Показатель сопоставлен",
+"Deviation explanation drafted":"Составлено объяснение отклонения"};
+const RX=[
+ [/^(\d+) blocking$/,m=>'блокирующих: '+m[1]],
+ [/^(\d+) to verify$/,m=>'на проверку: '+m[1]],
+ [/^(\d+) flags?$/,m=>'замечаний: '+m[1]],
+ [/^(\d+) of (\d+) approved$/,m=>m[1]+' из '+m[2]+' одобрено'],
+ [/^(\d+)\/(\d+) approved$/,m=>m[1]+'/'+m[2]+' одобрено'],
+ [/^(\d+) required figures still empty$/,m=>'Не заполнено обязательных цифр: '+m[1]],
+ [/^(\d+) lines are missing the evidence an auditor asks for\.$/,m=>'В '+m[1]+' строках нет подтверждений, которые спросит аудитор.'],
+ [/^(\d+) cost line\(s\) with a blocking evidence gap\.$/,m=>'Строк расходов с блокирующим пробелом: '+m[1]+'.'],
+ [/^(\d+) point\(s\) worth a human decision\.$/,m=>'Пунктов, требующих решения человека: '+m[1]+'.'],
+ [/^(\d+) indicators not mapped for the donor system$/,m=>'Не сопоставлено показателей для системы донора: '+m[1]],
+ [/^(\d+) unmapped$/,m=>'не сопоставлено: '+m[1]],
+ [/^(\d+) gap\(s\)$/,m=>'пробелов: '+m[1]],
+ [/^(\d+) headings breach the 10% rule and will need an explanation in the narrative$/,m=>'Нарушают правило 10% и потребуют объяснения в тексте отчёта статей: '+m[1]],
+ [/^(\d+) sections · (\d+) fields · drag a field by its handle to reorder$/,m=>'Разделов: '+m[1]+' · полей: '+m[2]+' · перетащите поле за рукоятку, чтобы переставить'],
+ [/^STEP (\d+) \/ (\d+)$/,m=>'ШАГ '+m[1]+' / '+m[2]],
+ [/^(\d+) cost lines$/,m=>'строк расходов: '+m[1]],
+ [/^\((\d+) of 16\)$/,m=>'('+m[1]+' из 16)'],
+ [/^(\d+) headings$/,m=>'статей: '+m[1]],
+ [/^Review (.+)$/,m=>'Проверить: '+m[1]],
+ [/^(€[\d,]+) would not survive an audit$/,m=>m[1]+' не пережили бы аудит'],
+ [/^(€[\d,]+) of costs at risk$/,m=>'Расходов под риском: '+m[1]],
+ [/^(C-\d+) — (€[\d,]+) at risk$/,m=>m[1]+' — под риском '+m[2]],
+ [/^Submitted · (\d+) open flag\(s\)$/,m=>'Сдан · открытых замечаний: '+m[1]],
+ [/^Q1 return — (.+)$/,m=>'Отчёт за Q1 — '+m[1]],
+ [/^Q1 cost lines — (.+)$/,m=>'Строки расходов за Q1 — '+m[1]],
+ [/^(.+) — Q1 return$/,m=>m[1]+' — отчёт за Q1'],
+ [/^Overall comment to (.+)$/,m=>'Общий комментарий для '+m[1]],
+ [/^Audit pack — (.+)$/,m=>'Папка для аудитора — '+m[1]],
+ [/^Structured interim form — (.+)$/,m=>'Структурированная промежуточная форма — '+m[1]],
+ [/^Encode (.+)$/,m=>'Закодировать '+m[1]],
+ [/^(.+) · (\d{4}-\d{2}-\d{2}) · not linked to an output$/,m=>m[1]+' · '+m[2]+' · нет привязки к результату'],
+ [/^(.+) · (\d{4}-\d{2}-\d{2}) · linked to$/,m=>m[1]+' · '+m[2]+' · привязано к'],
+ [/^Above the (€[\d,]+) threshold with no signed contract\.$/,m=>'Выше порога '+m[1]+' без подписанного договора.'],
+ [/^Above the (€[\d,]+) threshold with no documented comparison of offers\.$/,m=>'Выше порога '+m[1]+' без задокументированного сравнения предложений.'],
+ [/^Dated outside (.+) — it belongs to another reporting period\.$/,m=>'Дата вне периода '+m[1]+' — расход относится к другому отчётному периоду.'],
+ [/^Attach (.+)$/,m=>'Приложить: '+L(m[1].charAt(0).toUpperCase()+m[1].slice(1)).toLowerCase()],
+ [/^missing (.+)$/,m=>'нет: '+L(m[1])],
+ [/^(\d+)% of the (€[\d,]+) plan$/,m=>m[1]+'% от плана '+m[2]],
+ [/^Q1 landed (\d+)% under plan, concentrated in equipment\.$/,m=>'Q1 закрылся на '+m[1]+'% ниже плана, в основном по оборудованию.'],
+ [/^Female \+ male \((.+)\) does not reconcile with the total \((.+)\)\.$/,m=>'Женщины и мужчины ('+m[1]+') не сходятся с итогом ('+m[2]+').'],
+ [/^✓ (.+)$/,m=>'✓ '+L(m[1])],
+ [/^Two of your sources disagree on “(.+)”$/,m=>'Два ваших источника расходятся по полю «'+m[1]+'»'],
+ [/^— ([^:]+): (.+)$/,m=>EVENTS[m[1]]?'— '+EVENTS[m[1]]+': '+m[2]:m[0]],
+ [/^Does not address (.+)$/,m=>'Не отвечает на главное: '+m[1]],
+];
+const ENT={'&amp;':'&','&quot;':'"','&#39;':"'",'&lt;':'<','&gt;':'>'};
+function deent(s){return s.replace(/&(?:amp|quot|#39|lt|gt);/g,m=>ENT[m]);}
+const NORM=s=>s.replace(/\s+/g,' ').trim();
+const DICT_N={};Object.keys(DICT).forEach(k=>{DICT_N[NORM(k)]=DICT[k];});
+function L(s){
+ if(LANG!=='ru')return s;
+ const raw=deent((s+'').trim());
+ if(DICT[raw])return DICT[raw];
+ const k=NORM(raw);
+ if(DICT_N[k])return DICT_N[k];
+ for(const [re,fn] of RX){const m=k.match(re);if(m)return fn(m);}
+ return s;
+}
+/* Only text between tags and placeholder attributes are touched, so inline
+   handlers and markup cannot be corrupted by a translation. */
+function localize(html){
+ if(LANG!=='ru')return html;
+ return (html+'')
+  .replace(/>([^<]+)</g,(m,txt)=>{
+    const core=txt.trim();if(!core)return m;
+    const out=L(core);if(out===core)return m;
+    return '>'+txt.match(/^\s*/)[0]+out+txt.match(/\s*$/)[0]+'<';})
+  .replace(/placeholder="([^"]*)"/g,(m,p)=>'placeholder="'+(L(p)+'').replace(/"/g,'&quot;')+'"');
+}
+function setLang(l){
+ LANG=l;try{localStorage.setItem('v4d_lang',l);}catch(e){}
+ document.getElementById('lang-en').classList.toggle('active',l==='en');
+ document.getElementById('lang-ru').classList.toggle('active',l==='ru');
+ applyStaticLang();render();
+}
+function applyStaticLang(){
+ const ru=LANG==='ru';
+ document.getElementById('projline').textContent=ru
+  ?'€3,8 млн · EU / DG INTPA · консорциум из 4 партнёров · отчётный период Q1'
+  :'€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period';
+ document.getElementById('cmd').placeholder=ru?'Спросите что угодно об этой программе…':'Ask this programme anything…';
+ document.getElementById('qtitle').textContent=ru?'Что нужно от вас':'What needs you';
+ document.getElementById('qnote').textContent=ru
+  ?'Очередь строится из правил донора и состояния отчётного периода. Она меняется вместе с вашей ролью.'
+  :'The queue is built from the donor’s rules and the current state of the reporting period. It changes with your role.';
+ document.getElementById('p-lead').textContent=ru?'Ведущая':'Lead';
+ document.getElementById('p-partner').textContent=ru?'Партнёр':'Partner';
+ document.getElementById('p-mel').textContent=ru?'MEL-ревьюер':'MEL reviewer';
+ document.getElementById('b-tour').textContent=ru?'Тур':'Tour';
+ document.getElementById('b-reset').textContent=ru?'Сброс':'Reset';
+}
+
+/* ------------------------------ shell ----------------------------------- */
+function renderTabs(){
+ const q=queue();
+ document.getElementById('tabs').innerHTML=localize(WS.map(w=>{
+  const n=q.filter(i=>i.ws===w.id&&i.sev==='red').length;
+  const a=q.filter(i=>i.ws===w.id).length;
+  return `<button class="tab ${S.ws===w.id?'active':''}" onclick="go('${w.id}')">${w.label}
+    ${n?`<span class="cnt">${n}</span>`:a?`<span class="cnt q">${a}</span>`:''}</button>`;}).join(''));
+}
+function go(ws,sub){
+ S.ws=ws;if(sub)S.sub[ws]=sub;
+ renderTabs();render();window.scrollTo({top:0,behavior:'smooth'});
+}
+function subOf(ws){const l=SUBNAV[ws];if(!l)return null;return S.sub[ws]||l[0][0];}
+function subnav(ws){const l=SUBNAV[ws];if(!l)return '';
+ const cur=subOf(ws);
+ return `<div class="subnav">${l.map(([id,lab])=>`<button class="${cur===id?'active':''}" onclick="go('${ws}','${id}')">${lab}</button>`).join('')}</div>`;}
+function setPersona(p){
+ S.persona=p;['lead','partner','mel'].forEach(x=>document.getElementById('p-'+x).classList.toggle('active',x===p));
+ if(p==='partner'){S.sub.collect='returns';go('collect');}
+ else{S.sub.collect='review';go(S.ws==='collect'?'collect':S.ws);}
+ toast('Now viewing as: <b>'+({lead:'Consortium lead',partner:'Partner focal point — Riverbend Community Care',mel:'MEL reviewer'})[p]+'</b>');
+}
+const VIEW={};
+function render(){
+ const s=document.getElementById('surface');
+ s.classList.remove('fade');void s.offsetWidth;s.classList.add('fade');
+ const sub=subOf(S.ws);
+ s.innerHTML=localize((SUBNAV[S.ws]?subnav(S.ws):'')+(VIEW[sub||S.ws]||VIEW.sources)());
+ renderQueue();renderTabs();
+ if(sub==='control')drawChart();
+}
+
+/* ============================ SOURCES =================================== */
+VIEW.sources=function(){
+ if(!S.ingested){
+  return head('Sources','Drop in the documents that already govern this programme. Vizier reads them as they are — no template to fill in first.')
+  +panel(`<div class="dz" onclick="ingest()"><div style="font-family:var(--serif);font-size:17px">Drop the project documents here</div>
+    <div class="small" style="margin-top:5px">Call · proposal · results framework · budget · donor guidelines · partner logs</div>
+    <div style="margin-top:14px"><button class="btn">Load the demo set</button></div></div>
+    <div id="prog" class="small" style="margin-top:13px"></div>`)
+  +panel(`<h2>What happens to them</h2><div class="grid g3">
+     <div><div class="lbl">Read</div><div class="small">Indicators, baselines, targets, budget headings, deadlines and the donor’s reporting rules.</div></div>
+     <div><div class="lbl">Bind</div><div class="small">Each rule is bound to the field it will police, so a bad figure cannot enter the record.</div></div>
+     <div><div class="lbl">Trace</div><div class="small">Every number keeps a line back to the file and the row it came from.</div></div></div>`);
+ }
+ return head('Sources','Six files indexed. Click any of them to open at the exact line Vizier used.')
+  +panel(`<h2>Indexed files</h2><div class="grid g2">${Object.keys(SRC).map(k=>`<div class="docrow" onclick="openSource('${k}','')">
+    <span class="ext">${SRC[k].type}</span><span style="flex:1;min-width:0">
+    <div style="font-weight:600;font-size:13px">${esc(SRC[k].name)}</div><div class="small">${SRC[k].size}</div></span>
+    <span class="tag acc">bound</span></div>`).join('')}</div>`)
+  +panel(`<h2>Extraction</h2><div class="grid g3">${stat('indicators with targets','16','')}${stat('budget headings','8','')}${stat('rules now enforced','6','')}</div>
+    <div class="note" style="margin-top:14px">Nothing was re-keyed. From here the rules do the work: they build the collection form, police every figure, and fill the queue on the left.</div>`)
+  +`<div style="margin-top:15px;text-align:right"><button class="btn" onclick="go('framework')">Open the framework →</button></div>`;
+};
+function ingest(){
+ const steps=['Reading the call for proposals…','Parsing the results framework…','Mapping budget headings and phasing…','Extracting the donor reporting rules…','Binding each rule to a field…'];
+ const p=document.getElementById('prog');let i=0;
+ document.querySelector('.dz').innerHTML='<div style="font-family:var(--serif);font-size:17px">Reading your documents…</div>';
+ const t=setInterval(()=>{
+  if(i<steps.length){p.innerHTML+=`<div>· ${steps[i]}</div>`;i++;}
+  else{clearInterval(t);S.ingested=true;render();toast('Six files indexed. 16 indicators, 8 budget headings and 6 rules now enforced.');}
+ },420);
+}
+
+/* ============================ FRAMEWORK ================================= */
+VIEW.model=function(){
+ if(!S.ingested)return head('Framework')+locked('No sources indexed yet.','sources',null,'Go to sources');
+ const totB=BUDGET.reduce((a,b)=>a+b.b,0);
+ return head('What the donor demands','The obligations Vizier extracted, and what each one needs before a figure counts as reportable.')
+  +`<div class="grid g3" style="margin-bottom:14px">${stat('indicators with targets','16','')}${stat('budget','8 headings',eur(totB))}${stat('rules enforced','6','')}</div>`
+  +panel(`<h2>Indicators <span class="small">(7 of 16)</span></h2><div style="overflow-x:auto"><table>
+    <thead><tr><th>Code</th><th>Indicator</th><th>Base</th><th>Target</th><th>Lead</th><th>What it needs</th><th>Source</th></tr></thead>
+    <tbody>${INDICATORS.map(i=>`<tr><td class="mono" style="font-weight:700">${i.code}</td>
+     <td>${esc(i.label)} <span class="small">(${esc(i.unit)})</span></td><td class="mono">${esc(i.base)}</td>
+     <td class="mono" style="font-weight:700">${esc(i.target)}</td><td class="small">${esc(i.lead)}</td>
+     <td class="small">${esc(i.need)}</td><td>${src('logf',i.anchor,'framework')}</td></tr>`).join('')}</tbody></table></div>`)
+  +panel(`<h2>Rules bound to fields</h2><div class="grid g2">${RULES.map(r=>`<div class="item">
+    <div style="font-weight:650;font-size:13px">${esc(r.t)}</div><div class="small">${esc(r.d)}</div>
+    <div style="margin-top:6px">${src('guide',r.anchor,'guidelines')}</div></div>`).join('')}</div>`)
+  +panel(`<h2>Budget and Q1 phasing</h2><div style="overflow-x:auto"><table>
+    <thead><tr><th>Heading</th><th>Budget</th><th>Q1 plan</th><th>Q1 actual</th><th>Variance</th></tr></thead>
+    <tbody>${BUDGET.map(b=>{const v=b.q1p?Math.round((b.q1a-b.q1p)/b.q1p*100):0;const cls=Math.abs(v)>10?(v<0?'bad':'warn'):'';
+     return `<tr><td>${esc(b.h)}</td><td class="mono">${eur(b.b)}</td><td class="mono">${eur(b.q1p)}</td>
+      <td class="mono">${eur(b.q1a)}</td><td>${cls?`<span class="tag ${cls}">${v>0?'+':''}${v}%</span>`:`<span class="mono small">${v>0?'+':''}${v}%</span>`}</td></tr>`;}).join('')}
+    </tbody></table></div><div class="small" style="margin-top:9px">${BUDGET.filter(b=>b.q1p&&Math.abs((b.q1a-b.q1p)/b.q1p)>0.10).length} headings breach the 10% rule and will need an explanation in the narrative ${src('budg','Explain any heading deviation above 10%','budget rule')}.</div>`);
+};
+VIEW.template=function(){
+ if(!S.ingested)return head('What we collect')+locked('No sources indexed yet.','sources',null,'Go to sources');
+ const ed=can();
+ return head('What we collect','Generated from the rules on the left-hand tab. Edit it like a document — every field carries the obligation it exists for.')
+  +(ed?'':`<div class="locked">Viewing as a partner: the collection form is read-only until the lead activates it.</div>`)
+  +panel(`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+     <div style="flex:1"><div class="lbl">Form</div><div style="font-family:var(--serif);font-size:16px">${esc(TPL.name)}</div></div>
+     ${TPL.status==='active'?'<span class="tag good">live to partners</span>':'<span class="tag warn">draft</span>'}
+     ${ed?`<button class="btn ghost sm" onclick="addSection()">Add indicator</button>
+       <button class="btn sm" onclick="activateTpl()" ${TPL.status==='active'?'disabled':''}>${TPL.status==='active'?'Active':'Activate for partners'}</button>`:''}
+    </div><div class="small" style="margin-top:7px">${TPL.sections.length} sections · ${TPL.sections.reduce((a,s)=>a+s.fields.length,0)} fields · drag a field by its handle to reorder</div>`)
+  +`<div id="builder" style="margin-top:14px">${TPL.sections.map((s,i)=>sectionHTML(s,i,ed)).join('')}</div>`;
+};
+function sectionHTML(s,si,ed){
+ return `<div class="sec"><div style="display:flex;gap:10px;align-items:flex-start">
+   <span class="tag acc mono">${esc(s.ind)}</span>
+   <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(s.title)}</div>
+    <div class="small">${esc(s.why)} ${src('guide',s.anchor,'rule')}</div></div>
+   ${ed?`<button class="btn ghost sm" onclick="moveSection(${si},-1)">↑</button>
+        <button class="btn ghost sm" onclick="moveSection(${si},1)">↓</button>
+        <button class="btn ghost sm" onclick="delSection(${si})">✕</button>`:''}</div>
+  <div style="margin-top:11px">${s.fields.map((f,fi)=>fieldHTML(f,si,fi,ed)).join('')}</div>
+  ${ed?`<div style="margin-top:8px"><button class="btn ghost sm" onclick="addField(${si})">Add field</button></div>`:''}</div>`;
+}
+function fieldHTML(f,si,fi,ed){
+ if(!ed)return `<div class="frow"><span style="flex:1">${esc(f.l)}</span><span class="tag">${FTYPES[f.t]}</span>${f.req?'<span class="tag bad">required</span>':''}</div>`;
+ return `<div class="frow" draggable="true" ondragstart="dragStart(event,${si},${fi})" ondragend="dragEnd(event)"
+   ondragover="dragOver(event,this)" ondragleave="this.classList.remove('over')" ondrop="dropField(event,${si},${fi})">
+   <span class="handle">⠿</span><input class="field" style="flex:1" value="${esc(f.l)}" oninput="setLabel(${si},${fi},this.value)"/>
+   <select class="field" style="width:150px" onchange="setType(${si},${fi},this.value)">
+    ${Object.entries(FTYPES).map(([k,v])=>`<option value="${k}" ${f.t===k?'selected':''}>${v}</option>`).join('')}</select>
+   <button class="tag ${f.req?'bad':''}" onclick="toggleReq(${si},${fi})">${f.req?'required':'optional'}</button>
+   <button class="handle" onclick="delField(${si},${fi})">✕</button></div>`;
+}
+function refreshBuilder(){const b=document.getElementById('builder');if(b)b.innerHTML=TPL.sections.map((s,i)=>sectionHTML(s,i,can())).join('');}
+function setLabel(si,fi,v){TPL.sections[si].fields[fi].l=v;}
+function setType(si,fi,v){TPL.sections[si].fields[fi].t=v;refreshBuilder();}
+function toggleReq(si,fi){const f=TPL.sections[si].fields[fi];f.req=!f.req;refreshBuilder();}
+function delField(si,fi){TPL.sections[si].fields.splice(fi,1);refreshBuilder();}
+function addField(si){TPL.sections[si].fields.push({l:'New field',t:'text',req:false});refreshBuilder();toast('Field added — rename it and pick a type.');}
+function delSection(si){if(confirm('Remove this indicator section?')){TPL.sections.splice(si,1);refreshBuilder();}}
+function moveSection(si,d){const j=si+d;if(j<0||j>=TPL.sections.length)return;const a=TPL.sections;[a[si],a[j]]=[a[j],a[si]];refreshBuilder();}
+function addSection(){
+ const code=prompt('Add an indicator section. Type its code:\n\n'+INDICATORS.map(i=>i.code+' — '+i.label).join('\n'),'OP2.1');
+ if(!code)return;const ind=INDICATORS.find(i=>i.code.toLowerCase()===code.trim().toLowerCase());
+ TPL.sections.push({ind:ind?ind.code:code.trim().toUpperCase(),title:ind?ind.label:'New indicator',
+  why:ind?('Needs: '+ind.need):'Define what to collect.',anchor:ind?ind.anchor:'',
+  fields:[{l:'Value',t:'number',req:true},{l:'Means of verification',t:'text',req:true}]});
+ refreshBuilder();toast('Section added.');
+}
+let DRAG=null;
+function dragStart(e,si,fi){DRAG={si,fi};e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function dragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.frow.over').forEach(x=>x.classList.remove('over'));}
+function dragOver(e,el){e.preventDefault();el.classList.add('over');}
+function dropField(e,si,fi){e.preventDefault();if(!DRAG)return;if(DRAG.si!==si){DRAG=null;refreshBuilder();return;}
+ const a=TPL.sections[si].fields;const [m]=a.splice(DRAG.fi,1);a.splice(fi,0,m);DRAG=null;refreshBuilder();}
+function activateTpl(){TPL.status='active';render();toast('Form activated. It is now live to all three partners.');}
+
+/* ============================ COLLECTION ================================ */
+VIEW.returns=function(){
+ if(S.persona!=='partner')return head('Partner return')+`<div class="locked">You are the ${roleName().toLowerCase()}. This is the partner’s own form — switch role to see it, or open the returns in review.</div>
+   <button class="btn" onclick="setPersona('partner')">View as the partner</button>
+   <button class="btn ghost" style="margin-left:8px" onclick="go('collect','review')">Returns in review</button>`;
+ if(TPL.status!=='active')return head('My return')+locked('The lead has not activated the Q1 form yet.','framework','template','See the form');
+ const flags=validate();
+ const red=flags.filter(f=>f.sev==='red').length, amber=flags.filter(f=>f.sev==='amber').length;
+ const my=COMMENTS[ME];
+ return head('Q1 return — Riverbend Community Care','Your figures are checked against the donor rules and against your own source files as you type.')
+  +((my&&(my.overall||Object.keys(my.items||{}).length))?panel(`<h2>From your reviewer</h2>
+     ${my.overall?`<div style="font-size:13px">${esc(my.overall)}</div>`:''}
+     ${Object.entries(my.items||{}).map(([k,v])=>`<div class="small">· <b>${esc(k.split('::')[1])}</b> — ${esc(v)}</div>`).join('')}`,'', ):'')
+  +panel(`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1"><div class="lbl">Status</div><div style="font-weight:650">${S.submitted?'Submitted — with the reviewer':'Draft — due in 6 working days'}</div></div>
+    <span class="tag ${red?'bad':'good'}">${red} blocking</span><span class="tag ${amber?'warn':''}">${amber} to verify</span>
+    <button class="btn ghost sm" onclick="aiDraft()">Draft from my files</button>
+    <button class="btn sm" onclick="submitReturn()">Submit</button></div>
+   <div class="small" style="margin-top:7px">${esc(DRAFT_NOTE)}</div>`)
+  +TPL.sections.map(s=>returnSection(s,flags)).join('');
+};
+function returnSection(s,flags){
+ const sf=flags.filter(f=>f.ind===s.ind);
+ return panel(`<div style="display:flex;gap:9px;align-items:center;margin-bottom:3px">
+   <span class="tag acc mono">${esc(s.ind)}</span><b>${esc(s.title)}</b><span style="flex:1"></span>
+   ${sf.length?`<span class="tag ${sf.some(f=>f.sev==='red')?'bad':'warn'}">${sf.length} flag${sf.length>1?'s':''}</span>`:'<span class="tag good">clean</span>'}</div>
+  <div class="small" style="margin-bottom:11px">${esc(s.why)} ${src('guide',s.anchor,'rule')}</div>
+  <div class="grid g2">${s.fields.map(f=>returnField(s.ind,f,sf.find(x=>x.field===f.l))).join('')}</div>
+  ${(s.ind===CONFLICT.ind&&!S.conflictDone)?conflictBox():''}`);
+}
+function returnField(ind,f,flag){
+ if(ind===CONFLICT.ind&&f.l===CONFLICT.field&&!S.conflictDone)return '';
+ const v=(SUB[ind]&&SUB[ind][f.l]!==undefined)?SUB[ind][f.l]:'';
+ const ver=(VERIFY[ind]&&VERIFY[ind][f.l])||'';
+ const cm=(COMMENTS[ME]&&COMMENTS[ME].items&&COMMENTS[ME].items[ind+'::'+f.l])||'';
+ const bc=flag?(flag.sev==='red'?'var(--bad-line)':'var(--warn-line)'):(ver==='ok'?'var(--good-line)':'var(--line)');
+ const ctl=f.t==='longtext'
+  ?`<textarea class="field" rows="3" style="border-color:${bc}" oninput="setVal('${ind}','${attr(f.l)}',this.value)">${esc(v)}</textarea>`
+  :f.t==='file'
+  ?`<button class="btn ghost sm" onclick="attachEvidence('${ind}','${attr(f.l)}')">${v?'✓ '+esc(v):'Attach evidence'}</button>`
+  :`<input class="field" style="border-color:${bc}" value="${esc(v)}" oninput="setVal('${ind}','${attr(f.l)}',this.value)"/>`;
+ return `<div style="${f.t==='longtext'?'grid-column:1/-1':''}">
+  <div class="lbl" style="margin-bottom:4px">${esc(f.l)} ${f.req?'<span style="color:var(--bad)">*</span>':''}</div>${ctl}
+  ${flag?`<div class="flagline ${flag.sev==='red'?'red':'amber'}"><span>${flag.sev==='red'?'✕':'!'}</span><span>${esc(flag.msg)}</span></div>`:''}
+  ${!flag&&ver==='ok'?`<div class="flagline green"><span>✓</span><span>matches your Q1 source file</span></div>`:''}
+  ${!flag&&ver==='check'?`<div class="flagline amber"><span>!</span><span>could not verify against a source — confirm it</span></div>`:''}
+  ${cm?`<div class="flagline"><span>·</span><span>Reviewer: ${esc(cm)}</span></div>`:''}</div>`;
+}
+function conflictBox(){
+ return `<div style="margin-top:12px;border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:4px;padding:13px">
+  <div style="font-weight:700;color:var(--warn)">Two of your sources disagree on “${esc(CONFLICT.field)}”</div>
+  <div class="small" style="margin:4px 0 10px">Both figures sit in your own files ${src('rcclog','Campaign','RCC Q1 training logs')}. Pick the one to report; the choice is recorded with its reason.</div>
+  <div class="grid g2">${CONFLICT.options.map((o,i)=>`<button class="item" style="text-align:left" onclick="resolveConflict(${i})">
+   <div class="mono" style="font-size:19px;font-weight:700">${esc(o.v)}</div><div class="small">${esc(o.note)}</div>
+   <div style="margin-top:6px"><span class="tag ${o.ok?'good':'bad'}">${o.ok?'recommended — deduplicated':'double-counts repeat attendance'}</span></div></button>`).join('')}</div></div>`;
+}
+function resolveConflict(i){
+ const o=CONFLICT.options[i];
+ SUB[CONFLICT.ind]=SUB[CONFLICT.ind]||{};SUB[CONFLICT.ind][CONFLICT.field]=o.v;
+ VERIFY[CONFLICT.ind]=VERIFY[CONFLICT.ind]||{};VERIFY[CONFLICT.ind][CONFLICT.field]=o.ok?'ok':'check';
+ S.conflictDone=true;
+ logEvent('Source conflict resolved','OP3.1 total set to '+o.v+' — '+o.note);
+ render();
+ toast(o.ok?'Recorded 812 from the deduplicated register, with the reason attached.'
+           :'Recorded 1,140 from the raw sign-in sheet — flagged as double-counted for the reviewer.');
+}
+function setVal(ind,label,v){SUB[ind]=SUB[ind]||{};SUB[ind][label]=v;if(VERIFY[ind])VERIFY[ind][label]='';sched();}
+let _rt=null;function sched(){clearTimeout(_rt);_rt=setTimeout(()=>{if(S.ws==='collect')render();},800);}
+function attachEvidence(ind,label){SUB[ind]=SUB[ind]||{};SUB[ind][label]='certification-register-q1.xlsx';render();toast('Evidence attached and bound to the figure.');}
+function aiDraft(){
+ Object.entries(DRAFT).forEach(([ind,vals])=>{SUB[ind]=SUB[ind]||{};VERIFY[ind]=VERIFY[ind]||{};
+  Object.entries(vals).forEach(([k,v])=>{SUB[ind][k]=v;VERIFY[ind][k]='ok';});});
+ render();toast('Drafted from your Q1 files. One figure was left open because two of your own sources disagree.');
+}
+function validate(){
+ const out=[];
+ TPL.sections.forEach(s=>{
+  const vals=SUB[s.ind]||{};
+  s.fields.forEach(f=>{
+   if(s.ind===CONFLICT.ind&&f.l===CONFLICT.field&&!S.conflictDone){out.push({ind:s.ind,field:f.l,sev:'red',msg:'Unresolved source conflict.'});return;}
+   const v=(vals[f.l]||'').toString().trim();
+   if(f.req&&!v)out.push({ind:s.ind,field:f.l,sev:'red',msg:'Required by the donor form.'});
+  });
+  const nf=s.fields.find(f=>/numerator/i.test(f.l)), df=s.fields.find(f=>/denominator/i.test(f.l));
+  if(nf&&df){const n=num(vals[nf.l]),d=num(vals[df.l]);
+   if(n&&d&&n>d)out.push({ind:s.ind,field:nf.l,sev:'red',msg:'Numerator is larger than the denominator.'});}
+  if(s.ind==='OP3.1'){const tot=num(vals['Total certified (in-period)']),fm=num(vals['Female']),ml=num(vals['Male']);
+   if(tot&&fm&&ml&&Math.abs(tot-(fm+ml))>1)out.push({ind:s.ind,field:'Female',sev:'amber',msg:'Female + male ('+fmt(fm+ml)+') does not reconcile with the total ('+fmt(tot)+').'});}
+  if(s.ind==='OP1.3'){const p=num(vals['Female members (%)']);
+   if(p&&p<40)out.push({ind:s.ind,field:'Female members (%)',sev:'amber',msg:'Below the 40% floor in the results framework.'});}
+  if(s.ind===NARR_EXPECT.ind){const t=(vals['Narrative / barriers noted']||'').toLowerCase();
+   if(t&&t.length<50)out.push({ind:s.ind,field:'Narrative / barriers noted',sev:'amber',msg:'Too short to be usable in the donor report.'});
+   else if(t&&!NARR_EXPECT.words.some(w=>t.includes(w)))out.push({ind:s.ind,field:'Narrative / barriers noted',sev:'amber',msg:'Does not address '+NARR_EXPECT.topic+'.'});}
+ });
+ return out;
+}
+function submitReturn(){
+ const f=validate(),red=f.filter(x=>x.sev==='red').length;
+ if(red){toast('Cannot submit: '+red+' blocking issue'+(red>1?'s':'')+' left. The amber ones can travel with a note.');return;}
+ S.submitted=true;logEvent('Return submitted',ME+' — '+f.length+' open flag(s)');render();
+ toast('Return submitted'+(f.length?' with '+f.length+' open flag(s) the reviewer will see.':' — all donor checks pass.'));
+ setTimeout(()=>setPersona('mel'),900);
+}
+VIEW.review=function(){
+ if(S.persona==='partner')return head('Returns in review')+locked('Partners see only their own return.','collect','returns','Back to my return');
+ if(S.reviewTarget)return reviewDetail();
+ const rows=[{p:ME,note:S.submitted?'Submitted · '+validate().length+' open flag(s)':'Not submitted yet'},
+             {p:'Terrace Health Trust',note:'Submitted · all indicators complete'},
+             {p:'Summit Logistics Cooperative',note:'Submitted · 1 inclusion flag'}];
+ const all=rows.every(r=>APPROVED[r.p]);
+ return head('Returns in review','Three returns, already checked against the donor rules. What is left is judgement, not arithmetic.')
+  +panel(`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="flex:1"><div class="lbl">Q1</div><div style="font-family:var(--serif);font-size:16px">${rows.filter(r=>APPROVED[r.p]).length} of ${rows.length} approved</div></div>
+    <button class="btn" onclick="consolidate()" ${all?'':'disabled'}>Consolidate the donor report</button></div>`)
+  +rows.map(r=>panel(`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1"><b>${esc(r.p)}</b><div class="small">${esc(r.note)}</div></div>
+    ${APPROVED[r.p]?'<span class="tag good">approved</span>':'<span class="tag warn">awaiting review</span>'}
+    <button class="btn ghost sm" onclick="openPartner('${attr(r.p)}')">Open</button>
+    <button class="btn sm" onclick="approveP('${attr(r.p)}')" ${APPROVED[r.p]?'disabled':''}>Approve</button></div>
+   <div style="margin-top:10px">${(AI_REVIEW[r.p]||[]).map(i=>`<div class="flagline ${i.sev==='good'?'green':'amber'}">
+     <span>${i.sev==='good'?'✓':'!'}</span><span><b>${esc(i.t)}.</b> ${esc(i.d)}</span></div>`).join('')}</div>`)).join('');
+};
+function approveP(p){APPROVED[p]=true;logEvent('Return approved',p);render();toast(p+' approved.');}
+function openPartner(p){S.reviewTarget=p;render();}
+function closePartner(){S.reviewTarget='';render();}
+function partnerValues(p){return p===ME?SUB:(OTHER_SUB[p]||{});}
+function reviewDetail(){
+ const p=S.reviewTarget,vals=partnerValues(p),c=COMMENTS[p]||{overall:'',items:{}};
+ return head(esc(p)+' — Q1 return','Every figure carries its source. A comment on any line lands inside the partner’s own form.')
+  +`<div style="margin-bottom:13px"><button class="btn ghost sm" onclick="closePartner()">← All returns</button></div>`
+  +TPL.sections.map(s=>{const v=vals[s.ind]||{};
+   return panel(`<div style="display:flex;gap:9px;align-items:center;margin-bottom:9px">
+     <span class="tag acc mono">${esc(s.ind)}</span><b>${esc(s.title)}</b></div>
+    <table><tbody>${s.fields.map(f=>{const key=s.ind+'::'+f.l,val=v[f.l];
+      return `<tr><td style="width:45%">${esc(f.l)}</td>
+       <td class="mono" style="font-weight:600">${val?esc(val):'<span class="tag bad">missing</span>'}</td>
+       <td style="width:1%"><button class="btn ghost sm" onclick="addComment('${attr(p)}','${attr(key)}')">Comment</button></td></tr>
+       ${c.items[key]?`<tr><td colspan="3" class="small" style="color:var(--accent)">· ${esc(c.items[key])}</td></tr>`:''}`;}).join('')}
+    </tbody></table>`);}).join('')
+  +panel(`<h2>Overall comment to ${esc(p)}</h2>
+    <textarea class="field" rows="3" oninput="setOverall('${attr(p)}',this.value)" placeholder="What has to change before you approve?">${esc(c.overall||'')}</textarea>
+    <div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">
+     <button class="btn ghost" onclick="sendComments('${attr(p)}')">Send comments</button>
+     <button class="btn" onclick="approveP('${attr(p)}');closePartner()">Approve this return</button></div>`);
+}
+function setOverall(p,v){COMMENTS[p]=COMMENTS[p]||{overall:'',items:{}};COMMENTS[p].overall=v;}
+function addComment(p,key){const t=prompt('Comment for the partner on this line:');if(t==null||!t.trim())return;
+ COMMENTS[p]=COMMENTS[p]||{overall:'',items:{}};COMMENTS[p].items[key]=t;render();}
+function sendComments(p){const c=COMMENTS[p]||{items:{}};const n=Object.keys(c.items||{}).length+(c.overall?1:0);
+ toast('Sent '+n+' comment'+(n===1?'':'s')+' to '+p+' — they appear against the exact line in their own form.');}
+function consolidate(){S.consolidated=true;go('report','consolidated');toast('Consolidated. Every figure traces back to a partner return.');}
+
+/* ============================ COSTS & AUDIT ============================= */
+/* Every rule below mirrors a documented audit finding: personnel costs without reliable
+   time tracking, procurement without a documented comparison, costs that cannot be tied
+   to an output, bonuses linked solely to the action, and costs outside the period. */
+function costFlags(c){
+ const f=[];
+ const has=d=>c.have.includes(d);
+ if(!has('invoice')) f.push({sev:'red',m:'No invoice or proof of payment on file.',fix:'invoice'});
+ if(c.t==='staff'){
+  if(!has('timesheet')) f.push({sev:'red',m:'Personnel cost with no signed timesheet — the most frequent reason personnel costs are declared ineligible.',fix:'timesheet'});
+  else if(c.mismatch) f.push({sev:'amber',m:'Timesheet hours do not reconcile with the payroll record for the same month.'});
+  if(!has('payroll')) f.push({sev:'red',m:'No payroll record to support the declared salary cost.',fix:'payroll'});
+ }
+ if(c.t==='bonus') f.push({sev:'red',m:'A bonus linked solely to the funded action is not an eligible cost. Move it off the grant.',hard:true});
+ if(c.t==='procure'){
+  if(!has('contract')&&c.a>=PROC_THRESHOLD) f.push({sev:'red',m:'Above the €'+fmt(PROC_THRESHOLD)+' threshold with no signed contract.',fix:'contract'});
+  if(!has('quotes')&&c.a>=PROC_THRESHOLD) f.push({sev:'red',m:'Above the €'+fmt(PROC_THRESHOLD)+' threshold with no documented comparison of offers.',fix:'quotes'});
+ }
+ if(c.date>PERIOD.to||c.date<PERIOD.from) f.push({sev:'red',m:'Dated outside '+PERIOD.label+' — it belongs to another reporting period.',hard:true});
+ if(!c.link) f.push({sev:'amber',m:'Not linked to an output. An auditor will ask why this cost was necessary for the action.',fix:'link'});
+ return f;
+}
+function costTotals(){
+ let total=0,atRisk=0,clean=0;
+ COSTS.forEach(c=>{const f=costFlags(c);total+=c.a;
+  if(f.some(x=>x.sev==='red'))atRisk+=c.a;else if(!f.length)clean+=c.a;});
+ return {total,atRisk,clean};
+}
+function attachDoc(id,doc){
+ const c=COSTS.find(x=>x.id===id);if(!c||c.have.includes(doc))return;
+ c.have.push(doc);if(doc==='timesheet')c.mismatch=false;
+ logEvent('Evidence attached',DOCNAMES[doc]+' → '+id);
+ render();toast(DOCNAMES[doc]+' attached to '+id+' and bound to the cost line.');
+}
+function linkCost(id){
+ const c=COSTS.find(x=>x.id===id);if(!c)return;
+ const code=prompt('Link '+id+' to an output:\n\n'+INDICATORS.map(i=>i.code+' — '+i.label).join('\n'),'OP3.1');
+ if(!code)return;c.link=code.trim().toUpperCase();
+ logEvent('Cost linked to an output',id+' → '+c.link);
+ render();toast(id+' linked to '+c.link+'.');
+}
+function dropCost(id){
+ const c=COSTS.find(x=>x.id===id);if(!c)return;
+ if(!confirm('Move '+id+' ('+eur(c.a)+') off the grant? It stays in your own books, but leaves the claim.'))return;
+ COSTS=COSTS.filter(x=>x.id!==id);
+ logEvent('Cost removed from the claim',id+' — '+eur(c.a));
+ render();toast(id+' removed from the Q1 claim. The reason is recorded in the audit trail.');
+}
+VIEW.costs=function(){
+ if(TPL.status!=='active')return head('Costs')+locked('The lead has not opened the Q1 period yet.','framework','template','See the form');
+ const t=costTotals();
+ const mine=S.persona==='partner';
+ return head('Q1 cost lines'+(mine?' — Riverbend Community Care':''),
+   'Results tell the donor what happened; these lines are what gets audited. Each rule below is a documented reason costs are declared ineligible and clawed back.')
+  +`<div class="grid g3" style="margin-bottom:14px">
+    ${stat('Declared this period',eur(t.total),COSTS.length+' cost lines')}
+    ${stat('At risk of rejection',eur(t.atRisk),t.atRisk?'blocking evidence gaps':'nothing blocking')}
+    ${stat('Audit-ready',eur(t.clean),'complete evidence, linked to an output')}</div>`
+  +COSTS.map(c=>{
+   const f=costFlags(c),red=f.some(x=>x.sev==='red');
+   const missing=f.filter(x=>x.fix&&x.fix!=='link').map(x=>x.fix);
+   return `<div class="panel" style="border-color:${red?'var(--bad-line)':f.length?'var(--warn-line)':'var(--good-line)'}">
+    <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+     <span class="tag acc mono">${c.id}</span><b style="flex:1;min-width:180px">${esc(c.d)}</b>
+     <span class="mono" style="font-weight:700">${eur(c.a)}</span>
+     ${red?'<span class="tag bad">at risk</span>':f.length?'<span class="tag warn">to tidy</span>':'<span class="tag good">audit-ready</span>'}</div>
+    <div class="small" style="margin-top:3px">${esc(c.h)} · ${esc(c.date)} · ${c.link?'linked to <b>'+esc(c.link)+'</b>':'not linked to an output'}</div>
+    <div class="chiprow" style="margin-top:8px">${Object.keys(DOCNAMES).map(d=>{
+      const need=(d==='invoice')||(c.t==='staff'&&(d==='timesheet'||d==='payroll'))||(c.t==='procure'&&c.a>=PROC_THRESHOLD&&(d==='contract'||d==='quotes'));
+      if(!need&&!c.have.includes(d))return '';
+      return `<span class="tag ${c.have.includes(d)?'good':'bad'}">${c.have.includes(d)?'✓':'missing'} ${DOCNAMES[d]}</span>`;}).join('')}</div>
+    ${f.map(x=>`<div class="flagline ${x.sev==='red'?'red':'amber'}"><span>${x.sev==='red'?'✕':'!'}</span><span>${esc(x.m)}</span></div>`).join('')}
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+     ${missing.map(d=>`<button class="btn ghost sm" onclick="attachDoc('${c.id}','${d}')">Attach ${DOCNAMES[d].toLowerCase()}</button>`).join('')}
+     ${!c.link?`<button class="btn ghost sm" onclick="linkCost('${c.id}')">Link to an output</button>`:''}
+     ${f.some(x=>x.hard)?`<button class="btn sm" onclick="dropCost('${c.id}')">Take off the claim</button>`:''}
+    </div></div>`;}).join('')
+  +panel(`<h2>Audit trail</h2><div class="small" style="margin-bottom:9px">Append-only. This is what an auditor asks for when a figure changes after submission.</div>
+    ${LEDGER.length?LEDGER.map(l=>`<div class="flagline"><span class="mono small">${l.at}</span><span><b>${esc(l.by)}</b> — ${esc(l.what)}: ${esc(l.detail)}</span></div>`).join('')
+     :'<div class="small">Nothing recorded yet. Every attachment, link and removal from the claim lands here with the person and the time.</div>'}`);
+};
+VIEW.financial=function(){
+ const t=costTotals();
+ const q1p=BUDGET.reduce((a,b)=>a+b.q1p,0), q1a=BUDGET.reduce((a,b)=>a+b.q1a,0);
+ const breach=BUDGET.filter(b=>b.q1p&&Math.abs((b.q1a-b.q1p)/b.q1p)>0.10);
+ return head('Financial report and audit readiness','What the donor sees, and what an auditor would find. The second number is the one that costs money.')
+  +`<div class="grid g3" style="margin-bottom:14px">
+    ${stat('Q1 expenditure',eur(q1a),Math.round(q1a/q1p*100)+'% of the '+eur(q1p)+' plan')}
+    ${stat('Exposure if audited today',eur(t.atRisk),'cost lines with a blocking evidence gap')}
+    ${stat('Headings to explain',breach.length,'deviation above 10%')}</div>`
+  +panel(`<h2>By heading</h2><div style="overflow-x:auto"><table>
+    <thead><tr><th>Heading</th><th>Q1 plan</th><th>Q1 actual</th><th>Variance</th><th>Explanation</th></tr></thead>
+    <tbody>${BUDGET.map(b=>{const v=b.q1p?Math.round((b.q1a-b.q1p)/b.q1p*100):0;const bad=Math.abs(v)>10;
+     return `<tr><td>${esc(b.h)}</td><td class="mono">${eur(b.q1p)}</td><td class="mono">${eur(b.q1a)}</td>
+      <td>${bad?`<span class="tag ${v<0?'bad':'warn'}">${v>0?'+':''}${v}%</span>`:`<span class="mono small">${v>0?'+':''}${v}%</span>`}</td>
+      <td>${bad?`<button class="btn ghost sm" onclick="explainDeviation('${attr(b.h)}',${v})">Explain in the narrative</button>`:'<span class="small">not required</span>'}</td></tr>`;}).join('')}
+    </tbody></table></div>
+    <div class="small" style="margin-top:9px">The 10% rule comes from the grant agreement ${src('budg','Explain any heading deviation above 10%','budget rule')}.</div>`)
+  +panel(`<h2>Audit exposure</h2>
+    <div class="small" style="margin-bottom:10px">Cost lines that would not survive a check today, with the finding an auditor would write.</div>
+    ${COSTS.filter(c=>costFlags(c).some(x=>x.sev==='red')).map(c=>`<div class="item" style="display:flex;gap:10px;align-items:flex-start">
+      <span class="mono small" style="width:52px;flex:none">${c.id}</span>
+      <span style="flex:1"><b style="font-size:13px">${esc(c.d)}</b>
+       ${costFlags(c).filter(x=>x.sev==='red').map(x=>`<div class="flagline red"><span>✕</span><span>${esc(x.m)}</span></div>`).join('')}</span>
+      <span class="mono" style="font-weight:700">${eur(c.a)}</span></div>`).join('')
+     ||'<div class="flagline green"><span>✓</span><span>No blocking gaps. Every declared cost carries its evidence and an output.</span></div>'}
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+     <button class="btn ghost" onclick="go('collect','costs')">Open the cost lines</button>
+     <button class="btn" onclick="auditPack()">Assemble the audit pack</button></div>`)
+  +panel(`<h2>Audit trail</h2>${LEDGER.length?LEDGER.map(l=>`<div class="flagline"><span class="mono small">${l.at}</span>
+     <span><b>${esc(l.by)}</b> — ${esc(l.what)}: ${esc(l.detail)}</span></div>`).join('')
+   :'<div class="small">Empty. Every change to a figure or a document after submission is recorded here with the person and the time.</div>'}`);
+};
+function explainDeviation(h,v){
+ const s=findSec('ch');
+ const line=(v<0?'Underspend':'Overspend')+' on “'+h+'” of '+Math.abs(v)+'% against the Q1 plan. ';
+ s.v=(s.v?s.v+' ':'')+line;
+ recheck('ch');logEvent('Deviation explanation drafted',h+' ('+v+'%)');
+ go('report','narrative');toast('Added to “Challenges and adaptive measures” — finish the sentence with the reason and the corrective action.');
+}
+function auditPack(){
+ const t=costTotals();
+ const rows=COSTS.map(c=>{const f=costFlags(c);
+  return `${c.id}  ${c.h}\n  ${c.d}\n  ${eur(c.a)} · ${c.date} · ${c.link||'no output link'}\n  On file: ${c.have.map(d=>DOCNAMES[d]).join(', ')||'nothing'}\n  ${f.length?f.map(x=>(x.sev==='red'?'BLOCKING: ':'note: ')+x.m).join('\n  '):'complete'}`;}).join('\n\n');
+ modal(`<b>Audit pack — ${PERIOD.label}</b>
+  <div class="small" style="margin:4px 0 9px">Demo preview. In the live product this writes a folder: the cost ledger, every attached document, the trail of changes, and a cover note listing what is still missing.</div>
+  <div class="doc-body">COST LEDGER — ${PERIOD.label}
+Declared ${eur(t.total)} · at risk ${eur(t.atRisk)} · audit-ready ${eur(t.clean)}
+
+${rows}
+
+CHANGE TRAIL
+${LEDGER.length?LEDGER.map(l=>l.at+'  '+l.by+' — '+l.what+': '+l.detail).join('\n'):'(no changes recorded)'}</div>`,'760px');
+}
+
+/* ============================ REPORTING ================================= */
+VIEW.narrative=function(){
+ const red=NARRATIVE.sections.reduce((a,s)=>a+s.flags.filter(f=>f.s==='red').length,0);
+ const done=NARRATIVE.sections.filter(s=>s.approved).length;
+ return head('Narrative report','Drafted from the same data the figures come from. Everyone edits here; only the lead approves.')
+  +panel(`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1"><div class="lbl">Report</div><div style="font-family:var(--serif);font-size:16px">${esc(NARRATIVE.title)}</div></div>
+    <span class="tag ${red?'bad':'good'}">${red} blocking</span><span class="tag">${done}/${NARRATIVE.sections.length} approved</span>
+    ${can()?`<button class="btn sm" onclick="approveNarr()">Approve the report</button>`:''}</div>
+   <div class="note" style="margin-top:11px">Drop a document into a section and Vizier pulls the relevant facts in, then names what evidence is still missing.</div>`)
+  +NARRATIVE.sections.map(narrSection).join('');
+};
+function narrSection(s){
+ const red=s.flags.some(f=>f.s==='red');
+ return `<div class="panel" style="border-color:${s.approved?'var(--good-line)':red?'var(--bad-line)':'var(--line)'}">
+  <div style="display:flex;gap:10px;align-items:center"><b style="flex:1">${esc(s.t)}</b>
+   ${s.approved?'<span class="tag good">approved</span>':s.flags.length?`<span class="tag ${red?'bad':'warn'}">${s.flags.length} flag${s.flags.length>1?'s':''}</span>`:'<span class="tag">draft</span>'}</div>
+  <div class="small" style="margin:3px 0 9px">${esc(s.g)}</div>
+  ${s.approved?`<div style="font-size:13px;white-space:pre-wrap">${esc(s.v)}</div>`
+   :`<textarea class="field" rows="5" oninput="setNarr('${s.id}',this.value)" placeholder="Write here, or let Vizier draft it from the programme data.">${esc(s.v)}</textarea>`}
+  ${s.flags.map(f=>`<div class="flagline ${f.s==='red'?'red':'amber'}"><span>${f.s==='red'?'✕':'!'}</span><span>${esc(f.m)}</span></div>`).join('')}
+  ${s.attach.length?`<div class="chiprow" style="margin-top:8px">${s.attach.map(a=>`<span class="tag good">${esc(a)}</span>`).join('')}</div>`:''}
+  ${(!s.approved&&s.need.length)?`<div style="margin-top:10px"><div class="lbl">Evidence still needed</div>
+    ${s.need.map((n,i)=>`<div class="item" style="display:flex;gap:10px;align-items:center;margin-top:7px">
+     <span style="flex:1"><b style="font-size:13px">${esc(n.n)}</b><div class="small">${esc(n.g)}</div></span>
+     <button class="btn ghost sm" onclick="narrAttach('${s.id}',${i})">Attach</button></div>`).join('')}</div>`:''}
+  ${s.comments.length?`<div style="margin-top:10px">${s.comments.map(c=>`<div class="flagline"><span>·</span><span><b>${esc(c.by)}:</b> ${esc(c.text)}</span></div>`).join('')}</div>`:''}
+  ${s.approved?'':`<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn ghost sm" onclick="draftNarr('${s.id}')">${NARR_DRAFT[s.id]?'Draft this section':'Re-check'}</button>
+    <button class="btn ghost sm" onclick="commentNarr('${s.id}')">Comment</button>
+    ${can()?`<button class="btn sm" onclick="approveNarrSection('${s.id}')">Approve section</button>`:''}</div>`}</div>`;
+}
+function findSec(id){return NARRATIVE.sections.find(s=>s.id===id);}
+function setNarr(id,v){const s=findSec(id);if(!s)return;s.v=v;clearTimeout(NARRATIVE._t);
+ NARRATIVE._t=setTimeout(()=>{recheck(id);if(S.ws==='report')render();},900);}
+function recheck(id){
+ const s=findSec(id);if(!s||s.approved)return;
+ const v=(s.v||'').trim();let f=s.flags.filter(x=>!x.content);
+ const solid=v.length>=60&&v.split(/\s+/).filter(Boolean).length>=12;
+ if(!v)f.unshift({s:'red',content:true,m:'Empty — this section is required by the donor.'});
+ else if(!solid)f.unshift({s:'amber',content:true,m:'Reads thin — add specifics, figures and the evidence behind them.'});
+ if(id==='cc'&&v&&!/safeguard/i.test(v))f.unshift({s:'red',content:true,m:'Safeguarding subsection missing — mandatory.'});
+ s.flags=f;
+}
+function draftNarr(id){const s=findSec(id);if(!s)return;if(NARR_DRAFT[id])s.v=NARR_DRAFT[id];recheck(id);render();
+ toast(NARR_DRAFT[id]?'Drafted from the programme data. Review it, then attach the evidence it names.':'Re-checked against the donor rules.');}
+function narrAttach(id,i){const s=findSec(id);if(!s)return;const n=s.need[i];if(!n)return;
+ s.attach.push(n.n);s.need.splice(i,1);s.flags=s.flags.filter(f=>!f.evidence);render();
+ toast('Attached “'+n.n+'” and bound it to the figures in this section.');}
+function commentNarr(id){const t=prompt('Comment on this section:');if(t==null||!t.trim())return;
+ findSec(id).comments.push({by:roleName(),text:t});render();toast('Comment routed to the section owner.');}
+function approveNarrSection(id){const s=findSec(id);if(!s)return;
+ if(s.flags.some(f=>f.s==='red')){toast('Resolve the blocking flag first.');return;}
+ s.approved=true;s.flags=[];render();toast('Section approved.');}
+function approveNarr(){
+ if(NARRATIVE.sections.some(s=>s.flags.some(f=>f.s==='red'))){toast('Blocking flags remain — the queue on the left lists them.');return;}
+ NARRATIVE.sections.forEach(s=>{s.approved=true;s.flags=[];});NARRATIVE.status='approved';render();
+ toast('Narrative approved and locked into the record.');}
+
+VIEW.consolidated=function(){
+ if(!S.consolidated)return head('Consolidated report')+locked('Approve the three returns, then consolidate.','collect','review','Go to review');
+ const rcc=num((SUB['OP3.1']||{})['Total certified (in-period)'])||812;
+ const tot=rcc+num(OTHER_SUB['Terrace Health Trust']['OP3.1']['Total certified (in-period)'])+num(OTHER_SUB['Summit Logistics Cooperative']['OP3.1']['Total certified (in-period)']);
+ const all=[SUB,OTHER_SUB['Terrace Health Trust'],OTHER_SUB['Summit Logistics Cooperative']];
+ const nA=all.reduce((a,v)=>a+num((v['CC1']||{})['Answered within 14 days (numerator)']),0);
+ const nB=all.reduce((a,v)=>a+num((v['CC1']||{})['Feedback items received (denominator)']),0);
+ const rate=nB?Math.round(nA/nB*100):0;
+ const q1p=BUDGET.reduce((a,b)=>a+b.q1p,0), q1a=BUDGET.reduce((a,b)=>a+b.q1a,0);
+ return head('Q1 consolidated report','Assembled from the three approved returns and the narrative. Every figure keeps its line back to a source.')
+  +panel(`<h2>Hand it to the donor</h2>
+    <div class="small" style="margin-bottom:10px">Donors do not take a document any more — they take an encoded logframe in their own results system, or a structured interim form. Vizier assembles both from the same approved figures.</div>
+    <div class="chiprow">
+      <button class="btn ghost sm" onclick="exportResults()">Encode for the donor results system</button>
+      <button class="btn ghost sm" onclick="exportInterim()">Assemble the structured interim form</button>
+      ${['DOCX','PDF','XLSX'].map(x=>`<button class="chip" onclick="toast('Demo only — the live product writes a real ${x} here.')">${x}</button>`).join('')}
+    </div>`)
+  +panel(`<div class="lbl">European Union · DG INTPA · INTPA/TER/2025/04</div>
+    <h2 style="font-size:19px;margin:5px 0 14px">Cold Chain for Rural Clinics — Quarter 1</h2>
+    <div class="lbl">1. Executive summary</div>
+    <p style="font-size:13px">The consortium equipped 96 clinics ${src('logf','OP1.1 - Clinics with functioning cold chain equipment','OP1.1')},
+     certified <b>${fmt(tot)}</b> health workers ${src('logf','OP3.1 - Health workers trained and certified','OP3.1')} and answered
+     <b>${rate}%</b> of feedback within 14 days ${src('logf','CC1 - Feedback response rate','CC1')}. Potency at point of use rose from 82% to 91% against a 97% target.</p>
+    <div class="rule"></div>
+    <div class="lbl">2. Results by indicator</div>
+    <table style="margin-top:6px"><thead><tr><th>Code</th><th>Target</th><th>Q1 actual</th><th>Trace</th></tr></thead><tbody>
+     <tr><td class="mono">OP3.1</td><td>3,600</td><td class="mono" style="font-weight:700">${fmt(tot)}</td><td>${src('guide','All "people" indicators MUST be disaggregated','disaggregation rule')}</td></tr>
+     <tr><td class="mono">CC1</td><td>≥85%</td><td class="mono" style="font-weight:700">${rate}%</td><td>${src('logf','CC1 - Feedback response rate','feedback log')}</td></tr>
+     <tr><td class="mono">OC1.1</td><td>≥97%</td><td class="mono" style="font-weight:700">91%</td><td>${src('logf','OC1.1 - Vaccine potency at point of use','logger export')}</td></tr>
+     <tr><td class="mono">OP1.1</td><td>240</td><td class="mono" style="font-weight:700">96</td><td>${src('logf','OP1.1 - Clinics with functioning cold chain equipment','sign-off register')}</td></tr>
+     <tr><td class="mono">OP1.3</td><td>18</td><td class="mono" style="font-weight:700">11</td><td>${src('logf','OP1.3 - Clinic maintenance teams operating','rosters')}</td></tr></tbody></table>
+    <div class="rule"></div>
+    <div class="lbl">3. Narrative</div>
+    ${NARRATIVE.sections.map(s=>`<div style="margin-top:9px"><b style="font-size:13px">${esc(s.t)}</b>
+      ${s.approved?'<span class="tag good">approved</span>':'<span class="tag warn">provisional</span>'}
+      <div style="font-size:13px">${s.v?esc(s.v):'<span class="small">— empty —</span>'}</div></div>`).join('')}
+    <div class="rule"></div>
+    <div class="lbl">4. Financial report</div>
+    <p style="font-size:13px">Q1 expenditure ${eur(q1a)} against ${eur(q1p)} planned (${Math.round(q1a/q1p*100)}%).
+     ${BUDGET.filter(b=>b.q1p&&Math.abs((b.q1a-b.q1p)/b.q1p)>0.10).map(b=>esc(b.h)+' '+Math.abs(Math.round((b.q1a-b.q1p)/b.q1p*100))+'% '+(b.q1a<b.q1p?'under':'over')).join(', ')} —
+     each breaches the 10% rule and is explained in the narrative ${src('budg','Explain any heading deviation above 10%','budget rule')}.
+     ${costTotals().atRisk?`<br><span class="tag bad">audit exposure ${eur(costTotals().atRisk)}</span> <span class="small">cost lines that would not survive a check today — not yet cleared.</span>`:''}</p>`);
+};
+
+/* ---- donor hand-over: indicator encoding + structured interim form ---- */
+function setMapping(code,v){MAPPING[code]=v;logEvent('Indicator mapped',code+' → '+(v||'unmapped'));render();
+ if(document.querySelector('.modal-wrap'))exportResults(true);}
+function exportResults(replace){
+ if(replace&&document.querySelector('.modal-wrap'))document.querySelector('.modal-wrap').remove();
+ const unmapped=Object.entries(MAPPING).filter(([k,v])=>!v).length;
+ modal(`<b>Encode for the donor results system</b>
+  <div class="small" style="margin:4px 0 11px">The donor accepts indicators only against its own core list, so every project indicator has to be mapped before the logframe can be encoded.
+   The core list here is illustrative — the live product loads the donor’s current official one.</div>
+  <table><thead><tr><th>Our indicator</th><th>Q1 value</th><th>Donor core indicator</th></tr></thead><tbody>
+   ${Object.keys(MAPPING).map(code=>{const ind=INDICATORS.find(i=>i.code===code)||{label:code};
+    return `<tr><td><span class="mono" style="font-weight:700">${code}</span> <span class="small">${esc(ind.label||'')}</span></td>
+     <td class="mono">${esc(indicatorValue(code))}</td>
+     <td><select class="field" onchange="setMapping('${code}',this.value)">
+       <option value="">— not mapped —</option>
+       ${CORE_IND.map(ci=>`<option value="${ci.c}" ${MAPPING[code]===ci.c?'selected':''}>${ci.c} · ${esc(ci.l)}</option>`).join('')}
+     </select></td></tr>`;}).join('')}
+  </tbody></table>
+  <div style="margin-top:12px">${unmapped
+   ?`<span class="tag bad">${unmapped} unmapped</span> <span class="small">The system rejects a submission with an unmapped indicator. Map them, or mark them as project-specific.</span>`
+   :`<span class="tag good">ready to encode</span> <span class="small">All indicators carry a core-list target and a value with its source.</span>`}</div>
+  <div style="margin-top:12px"><button class="btn" ${unmapped?'disabled':''} onclick="toast('Demo only — the live product writes the encoded logframe into the donor system and stores the confirmation.');this.closest('.modal-wrap').remove()">Encode ${PERIOD.label}</button></div>`,'720px');
+}
+function indicatorValue(code){
+ const all=[SUB,OTHER_SUB['Terrace Health Trust'],OTHER_SUB['Summit Logistics Cooperative']];
+ if(code==='OP3.1')return fmt(all.reduce((a,v)=>a+num((v['OP3.1']||{})['Total certified (in-period)']),0));
+ if(code==='CC1'){const n=all.reduce((a,v)=>a+num((v['CC1']||{})['Answered within 14 days (numerator)']),0),
+  d=all.reduce((a,v)=>a+num((v['CC1']||{})['Feedback items received (denominator)']),0);return d?Math.round(n/d*100)+'%':'—';}
+ if(code==='OC2.2'){const n=all.reduce((a,v)=>a+num((v['OC2.2']||{})['Reporting confidence (numerator)']),0),
+  d=all.reduce((a,v)=>a+num((v['OC2.2']||{})['Surveyed (denominator)']),0);return d?Math.round(n/d*100)+'%':'—';}
+ if(code==='OP1.3')return '11';   // consortium-wide count, not a sum of partner rosters
+ return {'OC1.1':'91%','OP1.1':'96','OP2.1':'1,104'}[code]||'—';
+}
+function exportInterim(){
+ const t=costTotals();
+ const chapters=[
+  {c:'1',t:'Description of the action',s:'carried from the proposal, locked',ok:true},
+  {c:'2',t:'Context update [INT]',s:'from narrative section 2',ok:!!findSec('ctx').v},
+  {c:'3',t:'Results achieved against the logframe [INT]',s:'from the three approved returns',ok:S.consolidated},
+  {c:'4',t:'Beneficiaries reached, disaggregated [INT]',s:'from OP3.1, sex / age / disability',ok:true},
+  {c:'5',t:'Accountability, safeguarding and cross-cutting [INT]',s:'from narrative section 4',ok:/safeguard/i.test(findSec('cc').v||'')},
+  {c:'6',t:'Financial overview [INT]',s:'expenditure by heading, deviations above 10% explained',ok:!t.atRisk},
+  {c:'7',t:'Annexes and means of verification',s:'evidence attached to each figure',ok:true},
+ ];
+ const gaps=chapters.filter(c=>!c.ok);
+ modal(`<b>Structured interim form — ${PERIOD.label}</b>
+  <div class="small" style="margin:4px 0 11px">Assembled from what is already approved. Sub-chapters marked [INT] are the ones the interim report adds on top of the original proposal; the rest travels unchanged.</div>
+  ${chapters.map(c=>`<div class="item" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:7px">
+    <span class="mono small" style="width:18px;flex:none">${c.c}</span>
+    <span style="flex:1"><b style="font-size:13px">${esc(c.t)}</b><div class="small">${esc(c.s)}</div></span>
+    ${c.ok?'<span class="tag good">filled</span>':'<span class="tag bad">gap</span>'}</div>`).join('')}
+  <div style="margin-top:10px">${gaps.length
+   ?`<span class="tag bad">${gaps.length} gap(s)</span> <span class="small">The form can be saved as a draft, but not submitted until these are closed.</span>`
+   :'<span class="tag good">complete</span> <span class="small">Every sub-chapter has content and evidence behind it.</span>'}</div>
+  <div style="margin-top:12px"><button class="btn" onclick="toast('Demo only — the live product writes the form into the donor’s exchange system and keeps the submission receipt.');this.closest('.modal-wrap').remove()">${gaps.length?'Save as draft':'Submit the interim form'}</button></div>`,'720px');
+}
+
+/* ============================ SIGNALS =================================== */
+VIEW.control=function(){
+ const q1p=BUDGET.reduce((a,b)=>a+b.q1p,0), q1a=BUDGET.reduce((a,b)=>a+b.q1a,0);
+ const prog=[['OC1.1','Vaccine potency',91,97],['OP1.1','Clinics equipped',96,240],['OP1.3','Maintenance teams',11,18],['OP3.1','Workers certified',2656,3600],['OP2.1','Deliveries on window',1104,4800]];
+ return head('Control room','The programme while you can still change it, not a post-mortem next March.')
+  +`<div class="grid g3" style="margin-bottom:14px">
+    ${stat('Q1 spend against plan',Math.round(q1a/q1p*100)+'%',eur(q1a)+' of '+eur(q1p))}
+    ${stat('Health workers certified','2,656','74% of the Q1 milestone')}
+    ${stat('Partners reporting','3 / 3','on time')}</div>`
+  +`<div class="grid g2">
+    ${panel(`<h2>Spend against plan</h2><div class="small" style="margin-bottom:9px">Q1 landed ${Math.round((1-q1a/q1p)*100)}% under plan, concentrated in equipment.</div><div id="chart"></div>`)}
+    ${panel(`<h2>Indicator progress <span class="small">(% of full target)</span></h2>
+      ${prog.map(([c,l,a,t])=>{const pc=Math.round(a/t*100);return `<div style="margin-bottom:11px">
+       <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="mono" style="font-weight:700">${c}</span> ${l}</span>
+        <span class="mono">${fmt(a)} / ${fmt(t)} · ${pc}%</span></div>
+       <div class="bar" style="margin-top:4px"><i style="width:${Math.min(100,pc)}%;background:${pc<25?'var(--bad)':pc<50?'#C9922B':'var(--accent-2)'}"></i></div></div>`;}).join('')}`)}
+   </div>`
+  +`<div class="grid g2" style="margin-top:14px">
+    ${insight('Underspend risk','Terrace Health Trust is 21% under the Q1 equipment phasing — a projected €78,000 underspend by mid-year from refrigerators held at the port. Reroute the shipment or re-phase, this month.','Add to my actions')}
+    ${insight('Indicator lagging','OP1.3 (maintenance teams) sits at 61% of the Q1 milestone. Every quarter without a team is a quarter of unverified cold chain at 25 clinics.','Add to my actions')}
+   </div>`
+  +`<div class="grid g2" style="margin-top:14px">
+    ${panel(`<h2>Export and connect</h2><div class="small" style="margin-bottom:9px">Programme data leaves the way it came in.</div>
+      <div class="chiprow">${['IATI','API','Power BI','Google Drive','SharePoint','CSV'].map(x=>`<button class="chip" onclick="toast('Demo only — this would configure the ${x} connection.')">${x}</button>`).join('')}</div>`)}
+    ${panel(`<h2>Portfolio <span class="tag warn">preview</span></h2>
+      <div class="small">This organisation runs seven actions. A roll-up links shared indicators, repeated partners and lessons that transfer.</div>
+      <div style="margin-top:10px"><button class="btn ghost sm" onclick="portfolioInfo()">What this looks like</button></div>`)}
+   </div>`;
+};
+function drawChart(){
+ const el=document.getElementById('chart');if(!el)return;
+ const a1=Math.round(BUDGET.reduce((a,b)=>a+b.q1a,0)/1000), p1=Math.round(BUDGET.reduce((a,b)=>a+b.q1p,0)/1000);
+ const data=[{q:'Q1',p:p1,a:a1},{q:'Q2',p:532,a:0},{q:'Q3',p:608,a:0},{q:'Q4',p:570,a:0}];
+ const W=460,H=180,pad=26,max=650,bw=32;
+ const y=v=>H-pad-(v/max)*(H-pad*1.6);
+ let g='';
+ data.forEach((d,i)=>{const x=pad+18+i*((W-pad*2)/4);
+  g+=`<rect x="${x}" y="${y(d.p)}" width="${bw}" height="${H-pad-y(d.p)}" fill="#E1E3EA"/>`;
+  if(d.a)g+=`<rect x="${x+bw+4}" y="${y(d.a)}" width="${bw}" height="${H-pad-y(d.a)}" fill="#6C5FD0"/>`;
+  g+=`<text x="${x+bw}" y="${H-8}" font-size="10" fill="#6B7080" text-anchor="middle" font-family="monospace">${d.q}</text>`;
+  if(d.a)g+=`<text x="${x+bw+20}" y="${y(d.a)-5}" font-size="10" fill="#4B3FA8" text-anchor="middle" font-family="monospace">€${d.a}k</text>`;});
+ el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Planned versus actual spend by quarter">
+   <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#E1E3EA"/>${g}</svg>
+  <div class="chiprow" style="margin-top:6px"><span class="small">planned</span><span class="small" style="color:var(--accent)">actual</span></div>`;
+}
+function portfolioInfo(){modal(`<b>Portfolio roll-up</b>
+ <p style="font-size:13px">In the live product an organisation runs many actions in separate, access-controlled spaces. Authorised roles get a roll-up across them: the same indicator lagging in two actions, a partner appearing in four, a lesson from one that answers an open question in another.</p>
+ <p class="small">Preview only in this demo.</p>`);}
+
+VIEW.learning=function(){
+ return head('Learning','The questions you actually want answered, kept beside the evidence that answers them.')
+  +panel(`<h2>Learning questions</h2><div class="small" style="margin-bottom:9px">Edit these and Vizier re-checks every return and dataset against them.</div>
+    <div id="lqbox">${lqRows()}</div><div style="margin-top:8px"><button class="btn ghost sm" onclick="addLQ()">Add question</button></div>`)
+  +FINDINGS.map(f=>panel(`<div style="display:flex;gap:9px;align-items:center"><span class="tag acc mono">${f.lq}</span>
+     <b style="flex:1">${esc(f.q)}</b><span class="tag ${/High/.test(f.conf)?'good':/Low/.test(f.conf)?'bad':'warn'}">confidence: ${esc(f.conf)}</span></div>
+    <div style="font-size:13px;margin-top:9px">${esc(f.finding)}</div>
+    <div class="note" style="margin-top:9px"><b>Suggested action.</b> ${esc(f.action)}</div>
+    <div class="chiprow" style="margin-top:9px">${f.src.map(s=>src(s[0],s[1],'source')).join('')}
+     ${f.check?'<span class="tag warn">needs one more data point</span>':''}</div>`)).join('')
+  +panel(`<h2>This quarter’s open question</h2><div id="plqbox">${plqRows()}</div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" onclick="addPLQ()">Add</button>
+    <button class="btn sm" onclick="learningDoc()">Generate the learning document</button></div>`);
+};
+function lqRows(){return LQS.map((q,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+ <span class="mono small" style="width:26px">LQ${i+1}</span><input class="field" style="flex:1" value="${esc(q)}" oninput="LQS[${i}]=this.value"/>
+ <button class="handle" onclick="delLQ(${i})">✕</button></div>`).join('');}
+function refreshLQ(){const b=document.getElementById('lqbox');if(b)b.innerHTML=lqRows();}
+function addLQ(){LQS.push('New learning question');refreshLQ();}
+function delLQ(i){LQS.splice(i,1);refreshLQ();}
+function plqRows(){return PLQ.map((q,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+ <span class="mono small" style="width:26px">Q${i+1}</span><input class="field" style="flex:1" value="${esc(q)}" oninput="PLQ[${i}]=this.value"/>
+ <button class="handle" onclick="delPLQ(${i})">✕</button></div>`).join('');}
+function refreshPLQ(){const b=document.getElementById('plqbox');if(b)b.innerHTML=plqRows();}
+function addPLQ(){PLQ.push('New question');refreshPLQ();}
+function delPLQ(i){PLQ.splice(i,1);refreshPLQ();}
+function learningDoc(){modal(`<b>Q1 learning document (generated)</b>
+ <div class="small" style="margin:4px 0 9px">Demo preview. In the live product this compiles a formatted document for Word, PDF or your connected drive.</div>
+ <div class="doc-body">Q1 LEARNING DOCUMENT — COLD CHAIN FOR RURAL CLINICS
+
+LQ1 — Sustaining equipment.
+Clinics with a maintenance visit inside 60 days show 34% fewer failures; 11 of 18 teams operating.
+Action: stand up the remaining seven teams in the northern districts.
+
+LQ2 — Confidence in the cold chain.
+Confidence tracks visible alarm response rather than training hours (early signal).
+Action: publish per-district alarm response times against confidence scores.
+
+LQ3 — Inclusive feedback.
+86% response rate, but only 34% of feedback from women and health workers with disability against a 40% floor.
+Action: supervised drop-in desks and a voice channel; review in six weeks.</div>`,'700px');}
+
+/* ============================ FUNDING =================================== */
+VIEW.funding=function(){
+ const fit=S.curFit;
+ return head('Funding','What this consortium’s delivery record already qualifies it for — matched on evidence, not keywords.')
+  +panel(`<h2>Open calls</h2>${OPPS.map((o,i)=>`<div class="item" style="display:flex;gap:12px;align-items:flex-start;margin-top:9px">
+    <div style="width:52px;flex:none;text-align:center">
+      <div style="font-family:var(--serif);font-size:20px;color:${o.fit>85?'var(--good)':o.fit>70?'var(--warn)':'var(--muted)'}">${o.fit}%</div>
+      <div class="lbl" style="font-size:8px">fit</div></div>
+    <div style="flex:1;min-width:0"><b style="font-size:13px">${esc(o.t)}</b>
+      <div class="small">${esc(o.donor)} · closes ${esc(o.deadline)}</div>
+      <div class="chiprow" style="margin-top:6px">${o.why.map(w=>`<span class="tag good">${esc(w)}</span>`).join('')}
+       ${o.gap?`<span class="tag warn">gap: ${esc(o.gap)}</span>`:''}</div></div>
+    <button class="btn ghost sm" onclick="addPipeline(${i})">Track</button></div>`).join('')}
+   ${PIPELINE.length?`<div style="margin-top:12px"><div class="lbl">Tracked</div>
+     <div class="chiprow" style="margin-top:6px">${PIPELINE.map(p=>`<span class="tag acc">${esc(p)}</span>`).join('')}</div></div>`:''}`)
+  +panel(`<h2>Draft proposal review</h2>${!S.propReviewed
+   ?`<div class="small">Vizier reads a draft against the call and against what this consortium can actually evidence.</div>
+     <div style="margin-top:10px"><button class="btn" onclick="reviewProposal()">Review our INTPA second-phase draft</button></div>`
+   :`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div><div style="font-family:var(--serif);font-size:30px;color:${fit>85?'var(--good)':'var(--warn)'}">${fit}%</div><div class="lbl">fit against the call</div></div>
+      <div class="bar" style="flex:1;min-width:160px"><i style="width:${fit}%"></i></div></div>
+     <div class="grid g2" style="margin-top:14px">
+      <div><div class="lbl">Evidenced strengths</div>${PROP_REVIEW.strengths.map(s=>`<div class="flagline green"><span>✓</span><span>${esc(s)}</span></div>`).join('')}</div>
+      <div><div class="lbl">Gaps a reviewer will find</div>${PROP_REVIEW.gaps.map(s=>`<div class="flagline amber"><span>!</span><span>${esc(s)}</span></div>`).join('')}</div></div>
+     <div style="margin-top:14px"><div class="lbl">What to attach</div>
+      ${PROP_REVIEW.asks.map(a=>`<div class="item" style="display:flex;gap:10px;align-items:center;margin-top:7px">
+       <span style="flex:1;font-size:13px">${esc(a)}</span><button class="btn ghost sm" onclick="attachProp()">Attach</button></div>`).join('')}</div>`}`);
+};
+function addPipeline(i){const o=OPPS[i];if(PIPELINE.includes(o.t))return;PIPELINE.push(o.t);render();
+ toast('Tracking “'+o.t+'”. The deadline and the missing evidence now sit in your queue.');}
+function reviewProposal(){toast('Reading the draft against the call and your delivery record…');
+ setTimeout(()=>{S.propReviewed=true;S.curFit=PROP_REVIEW.fit;render();},700);}
+function attachProp(){S.curFit=Math.min(89,S.curFit+5);render();toast('Attached — fit is now '+S.curFit+'%.');}
+
+/* ============================ COMMAND BAR =============================== */
+function ask(){
+ const raw=(document.getElementById('cmd').value||'').trim();
+ if(!raw)return;
+ const q=raw.toLowerCase();
+ const hit=QA.find(x=>{const w=x.q.toLowerCase().split(/\W+/).filter(t=>t.length>4);
+  return w.filter(t=>q.includes(t)).length>=2;});
+ drawer(`<div class="lbl">Question</div><div style="font-family:var(--serif);font-size:17px;margin:4px 0 14px">${esc(raw)}</div>
+  <div class="small">Reading the returns, the framework and the budget…</div>`);
+ setTimeout(()=>{
+  drawer(`<div class="lbl">Question</div><div style="font-family:var(--serif);font-size:17px;margin:4px 0 14px">${esc(raw)}</div>
+   ${hit?`<div style="font-size:13px">${hit.a}</div>
+     <div class="chiprow" style="margin-top:12px">${hit.src.map(s=>src(s[0],s[1],'source')).join('')}</div>
+     <div class="small" style="margin-top:10px">Answered from this programme’s own documents and returns. If the data is not there, Vizier says so instead of guessing.</div>`
+    :`<div style="font-size:13px">Nothing in this programme answers that yet.</div>
+      <div class="lbl" style="margin-top:14px">Try one of these</div>
+      <div style="margin-top:6px">${QA.map(x=>`<button class="chip" style="display:block;text-align:left;margin-bottom:6px;width:100%" onclick="document.getElementById('cmd').value=this.textContent.trim();ask()">${esc(x.q)}</button>`).join('')}</div>`}`);
+ },600);
+}
+function drawer(html){
+ let d=document.getElementById('drawer');
+ if(!d){d=document.createElement('div');d.id='drawer';document.body.appendChild(d);}
+ d.innerHTML=localize(`<div style="display:flex;align-items:center;margin-bottom:14px"><span class="tag acc">Vizier</span><span style="flex:1"></span>
+   <button class="tbtn" onclick="document.getElementById('drawer').remove()">Close</button></div>`+html);
+}
+
+/* ============================ TOUR / RESET ============================== */
+const TOUR=[
+ {ws:'sources',m:'Everything starts from the documents that already govern the programme. Vizier reads them and binds each donor rule to the field it will police.'},
+ {ws:'framework',sub:'model',m:'This is what the donor demands: indicators, targets and six rules. Nothing here was typed by hand.'},
+ {ws:'framework',sub:'template',m:'And this is what you collect — generated from those rules. Every field carries the obligation behind it.'},
+ {ws:'collect',sub:'returns',m:'Partners file into it. Figures are checked as they are typed: missing disaggregation, a numerator above its denominator, two of their own sources disagreeing.'},
+ {ws:'collect',sub:'costs',m:'Results are only half the report. These are the cost lines, checked against the reasons costs actually get declared ineligible: personnel time without a signed timesheet, procurement above the threshold without a comparison of offers, a cost nobody can tie to an output.'},
+ {ws:'collect',sub:'review',m:'The reviewer gets checked returns with the judgement calls surfaced, comments on any line, approves, consolidates.'},
+ {ws:'report',sub:'narrative',m:'The narrative is drafted from the same data, and flagged where it is thin, unevidenced or missing a mandatory subsection.'},
+ {ws:'report',sub:'financial',m:'This is the number that costs real money: what would not survive an audit today, line by line, with the finding an auditor would write. Plus the trail of who changed what after submission.'},
+ {ws:'report',sub:'consolidated',m:'And the hand-over. Donors take an encoded logframe in their own results system or a structured interim form — not a document — so Vizier assembles both from the approved figures and refuses to submit with an unmapped indicator.'},
+ {ws:'signals',sub:'control',m:'The same data runs the control room — underspend and lagging indicators while you can still act. And the queue on the left is the whole product in one column: it always knows what needs you next.'},
+];
+let ti=-1;
+function startTour(){ti=0;tourStep();}
+function tourStep(){const s=TOUR[ti];go(s.ws,s.sub);
+ const c=document.getElementById('coach');c.classList.remove('hidden');
+ c.innerHTML=localize(`<div class="step">STEP ${ti+1} / ${TOUR.length}</div><div style="font-size:13px">${LANG==='ru'&&TOUR_RU[ti]?TOUR_RU[ti]:s.m}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+   <button class="small" style="color:#8B90A0" onclick="endTour()">Skip</button>
+   <button class="btn sm" onclick="nextStep()">${ti<TOUR.length-1?'Next':'Finish'}</button></div>`);}
+const TOUR_RU=[
+ 'Всё начинается с документов, которые уже управляют программой. Vizier читает их и привязывает каждое правило донора к полю, которое оно будет контролировать.',
+ 'Вот что требует донор: показатели, цели и шесть правил. Ничего из этого не набрано руками.',
+ 'А вот что вы собираете — форма выведена из тех самых правил. Каждое поле несёт обязательство, ради которого существует.',
+ 'Партнёры заполняют её, а цифры проверяются прямо при вводе: нет дизагрегации, числитель больше знаменателя, два собственных источника партнёра расходятся между собой.',
+ 'Результаты — только половина отчёта. Это строки расходов, проверенные по тем причинам, по которым расходы реально признают неприемлемыми: время персонала без подписанного табеля, закупка выше порога без сравнения предложений, расход, который никто не может привязать к результату.',
+ 'Ревьюер получает проверенные отчёты с вынесенными наверх спорными местами, комментирует любую строку, одобряет и сводит.',
+ 'Текстовая часть собирается из тех же данных, и подсвечивается там, где пусто, бездоказательно или не хватает обязательного подраздела.',
+ 'Вот цифра, которая стоит настоящих денег: что не пережило бы аудит сегодня, построчно, с формулировкой, которую написал бы аудитор. И след того, кто что менял после сдачи.',
+ 'И передача. Донор принимает закодированную логфрейм-таблицу в своей системе результатов или структурированную промежуточную форму, а не документ. Vizier собирает обе из одобренных цифр и не даст сдать с несопоставленным показателем.',
+ 'Те же данные ведут пульт: недорасход и отстающие показатели видны, пока на них ещё можно повлиять. А очередь слева — весь продукт в одной колонке: она всегда знает, что нужно от вас дальше.',
+];
+function nextStep(){ti++;if(ti>=TOUR.length){endTour();return;}tourStep();}
+function endTour(){document.getElementById('coach').classList.add('hidden');ti=-1;}
+
+function resetDemo(){
+ TPL=defaultTemplate();NARRATIVE=defaultNarr();SUB={};VERIFY={};COMMENTS={};APPROVED={};
+ LQS=[...LEARNING_Q];PLQ=['How is the alarm-response routine landing with clinic staff?'];PIPELINE=[];
+ COSTS=defaultCosts();LEDGER=[];MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
+ Object.assign(S,{persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
+  consolidated:false,reviewTarget:'',propReviewed:false,curFit:PROP_REVIEW.fit});
+ ['lead','partner','mel'].forEach(x=>document.getElementById('p-'+x).classList.toggle('active',x==='lead'));
+ const d=document.getElementById('drawer');if(d)d.remove();
+ endTour();render();toast('Demo reset.');
+}
+
+/* ============================ BOOT ====================================== */
+VIEW.collect=function(){return VIEW.returns();};
+VIEW.framework=function(){return VIEW.model();};
+VIEW.report=function(){return VIEW.narrative();};
+VIEW.signals=function(){return VIEW.control();};
+applyStaticLang();
+document.getElementById('lang-'+LANG).classList.add('active');
+render();
+</script>
+</body>
+</html>

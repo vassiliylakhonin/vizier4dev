@@ -1,0 +1,39 @@
+# Vizier4Dev
+
+Quarterly reporting workspace for grant-funded consortia. Two self-contained HTML files, no build step, no dependencies, no network calls.
+
+- `index.html` — the demo workspace. Open it in a browser.
+- `landing.html` — the public page describing it, linking to the demo.
+
+## What it demonstrates
+
+A reporting period for a four-partner, EU-funded action, run end to end:
+
+1. **Sources** — grant documents are indexed; every figure keeps a link back to the file and line it came from.
+2. **Framework** — indicators, targets, budget headings and six donor rules are extracted, and each rule is bound to the field it will police.
+3. **Collection** — partners file results and cost lines. Figures are checked while they are typed: disaggregation that does not reconcile, a numerator above its denominator, a percentage below the framework floor, a narrative too thin to use, and two of a partner's own sources disagreeing on the same total.
+4. **Costs and audit** — cost lines are checked against documented reasons costs are declared ineligible: personnel time with no signed timesheet, procurement above the threshold with no comparison of offers, a cost dated outside the period, a cost not linked to any output, a bonus that is not eligible. The screen carries two numbers: what was declared, and what would not survive a check today.
+5. **Reporting** — narrative drafted from the same data, reviewer comments routed to the exact line, consolidation once all returns are approved.
+6. **Hand-over** — the approved figures are encoded for a donor results system (with an indicator-mapping gate) or assembled into a structured interim form with its sub-chapters.
+7. **Signals and funding** — control room, learning questions, and a funding pipeline with a draft-proposal review.
+
+A role switcher (lead / partner / MEL reviewer) changes both permissions and the work queue on the left, which is rebuilt from the donor rules and the state of the period.
+
+## Languages
+
+English and Russian, switchable in the top bar of both files; the choice is remembered in `localStorage`.
+
+What Vizier says to you is translated. What comes out of the donor's own documents — indicator codes and labels, form field labels, file contents, budget headings, partner names — stays in the donor's language, because that is what gets submitted and what an auditor reads.
+
+## Status
+
+Working demo on fictional data. No account, no storage, no service behind it. No customers, no pilots.
+
+The programme, the partners and every figure are invented. The rules the demo enforces follow published guidance on EU grant reporting and audit findings; thresholds and the reporting period belong to a grant agreement and change per action.
+
+Not legal, financial, compliance or audit advice. Human review is required before anything is filed with a donor.
+
+## Open items
+
+- The founder paragraph and the price block on `landing.html` are marked as drafts and must be filled in or removed before the page is published anywhere.
+- The contact link points at a personal mailbox; a domain address is the fix.

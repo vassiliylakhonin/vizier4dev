@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vizier4Dev — quarterly reporting for grant-funded consortia</title>
+<meta name="description" content="Vizier4Dev reads your grant documents, builds the partner reporting form from the donor's own rules, checks every figure and every cost against them, and hands the result to the donor's system. Working demo, fictional data, no customers yet." />
+<style>
+:root{
+  --ink:#191A20; --ink-2:#3D4049; --muted:#6B7080; --faint:#9AA0AE;
+  --canvas:#F1F2F5; --paper:#FFFFFF; --line:#E1E3EA; --line-2:#EEF0F4;
+  --accent:#4B3FA8; --accent-2:#6C5FD0; --accent-soft:#EFEDFB;
+  --bad:#B3261E; --bad-bg:#FCF1F0; --bad-line:#EEC0BC;
+  --warn:#8A5A00; --warn-bg:#FDF8EC; --warn-line:#E8D2A0;
+  --good:#1B6E3C; --good-bg:#EFF7F1; --good-line:#B3D7C0;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased;}
+button{font:inherit;cursor:pointer;background:none;border:none;padding:0;}
+a{color:var(--accent);}
+.mono{font-family:var(--mono);}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px;}
+.narrow{max-width:760px;}
+
+/* language */
+.ru{display:none;}
+body.lang-ru .en{display:none;}
+body.lang-ru .ru{display:block;}
+body.lang-ru li.ru,body.lang-ru span.ru{display:list-item;}
+body.lang-ru span.ru{display:inline;}
+.langsw{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-left:6px;}
+.langsw button{padding:5px 9px;font-size:12px;color:var(--muted);border-right:1px solid var(--line);}
+.langsw button:last-child{border-right:none;}
+.langsw button.active{background:var(--ink);color:#fff;}
+
+/* header */
+header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(255,255,255,.94);backdrop-filter:blur(6px);z-index:20;}
+.bar{display:flex;align-items:center;gap:14px;padding:12px 0;}
+.wordmark{font-family:var(--serif);font-size:20px;display:flex;align-items:baseline;gap:5px;}
+.wordmark i{font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.06em;background:var(--accent);color:#fff;border-radius:3px;padding:2px 5px;position:relative;top:-2px;}
+nav{margin-left:auto;display:flex;gap:16px;align-items:center;}
+nav a{color:var(--muted);text-decoration:none;font-size:14px;}
+nav a:hover{color:var(--ink);}
+.btn{display:inline-block;border-radius:4px;padding:9px 16px;font-size:15px;font-weight:600;background:var(--accent);color:#fff;text-decoration:none;border:1px solid var(--accent);}
+.btn:hover{background:#3F349A;}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--line);}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn.sm{padding:6px 12px;font-size:14px;}
+
+/* sections */
+section{padding:66px 0;border-bottom:1px solid var(--line-2);}
+section.alt{background:var(--canvas);}
+h1{font-family:var(--serif);font-size:clamp(30px,4.6vw,46px);line-height:1.14;letter-spacing:-.015em;font-weight:600;margin:0 0 18px;}
+h2{font-family:var(--serif);font-size:clamp(23px,3vw,31px);line-height:1.2;letter-spacing:-.01em;font-weight:600;margin:0 0 14px;}
+h3{font-size:16px;margin:0 0 5px;}
+p{margin:0 0 15px;max-width:70ch;}
+.lead{font-size:18px;color:var(--ink-2);}
+.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.17em;color:var(--accent);font-weight:700;margin-bottom:12px;}
+.muted{color:var(--muted);}
+.small{font-size:13.5px;color:var(--muted);}
+.cta-row{display:flex;gap:11px;flex-wrap:wrap;align-items:center;margin-top:22px;}
+.grid{display:grid;gap:18px;}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:20px;}
+.card.flat{background:transparent;border:none;padding:0;}
+.step{display:flex;gap:16px;padding:16px 0;border-top:1px solid var(--line);}
+.step .n{font-family:var(--mono);font-size:12px;color:var(--accent);width:28px;flex:none;padding-top:3px;}
+.step p{margin:0;font-size:15px;}
+.list{list-style:none;padding:0;margin:0;}
+.list li{padding:8px 0 8px 20px;border-bottom:1px solid var(--line-2);position:relative;font-size:15px;}
+.list li:before{content:"";position:absolute;left:2px;top:16px;width:6px;height:6px;border-radius:99px;background:var(--accent-2);}
+.figure{border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--canvas);}
+.figure .head{display:flex;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);background:#fff;}
+.figure .dot{width:9px;height:9px;border-radius:99px;background:var(--line);}
+.figure .body{padding:16px;}
+.numrow{display:flex;gap:14px;flex-wrap:wrap;}
+.num{background:#fff;border:1px solid var(--line);border-radius:4px;padding:14px 16px;flex:1;min-width:150px;}
+.num b{font-family:var(--serif);font-size:26px;display:block;letter-spacing:-.02em;}
+.num span{font-size:13px;color:var(--muted);}
+.todo{border:1px dashed var(--warn-line);background:var(--warn-bg);border-radius:4px;padding:16px;}
+.todo b{color:var(--warn);}
+blockquote{margin:0;padding:14px 18px;border-left:2px solid var(--accent-2);background:var(--accent-soft);font-size:15px;}
+footer{padding:34px 0 60px;font-size:13.5px;color:var(--muted);}
+footer a{color:var(--muted);}
+@media(max-width:820px){.g2{grid-template-columns:1fr;} nav a:not(.btn){display:none;} section{padding:46px 0;}}
+</style>
+</head>
+<body>
+
+<header><div class="wrap bar">
+  <div class="wordmark">Vizier<i>4dev</i></div>
+  <nav>
+    <a href="#problem"><span class="en">The problem</span><span class="ru">Проблема</span></a>
+    <a href="#how"><span class="en">How it works</span><span class="ru">Как работает</span></a>
+    <a href="#costs"><span class="en">Costs and audit</span><span class="ru">Расходы и аудит</span></a>
+    <a href="#limits"><span class="en">What it is not</span><span class="ru">Чем это не является</span></a>
+    <a class="btn sm" href="index.html"><span class="en">Open the demo</span><span class="ru">Открыть демо</span></a>
+    <span class="langsw"><button id="l-en" onclick="setLang('en')">EN</button><button id="l-ru" onclick="setLang('ru')">RU</button></span>
+  </nav>
+</div></header>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">Quarterly reporting for grant-funded consortia</span><span class="ru">Квартальная отчётность грантовых консорциумов</span></div>
+    <h1 class="en">The donor’s rules already exist. The form, the checks and the hand-over should come from them.</h1>
+    <h1 class="ru">Правила донора уже написаны. Форма, проверки и передача должны выводиться из них.</h1>
+    <p class="lead en">Vizier4Dev reads your grant agreement, results framework and reporting guidelines, then builds the partner reporting form out of them. It checks figures as they are typed, and cost lines against the reasons costs get declared ineligible. What comes out the other end is the encoded logframe or the structured interim form the donor’s system takes.</p>
+    <p class="lead ru">Vizier4Dev читает грантовое соглашение, рамку результатов и правила отчётности донора, а затем строит из них форму для партнёров. Цифры проверяются прямо при вводе, строки расходов — по тем причинам, из-за которых расходы признают неприемлемыми. На выходе получается закодированная логфрейм-таблица или структурированная промежуточная форма, которую принимает система донора.</p>
+    <div class="cta-row">
+      <a class="btn" href="index.html"><span class="en">Open the demo</span><span class="ru">Открыть демо</span></a>
+      <a class="btn ghost" href="#talk"><span class="en">Tell me how you close your quarter</span><span class="ru">Расскажите, как вы закрываете квартал</span></a>
+    </div>
+    <p class="small en" style="margin-top:16px">Working demo with fictional data. No customers, no pilots, nothing sold yet. I am looking for people who do this work to tell me where it is wrong.</p>
+    <p class="small ru" style="margin-top:16px">Рабочее демо на выдуманных данных. Ни клиентов, ни пилотов, ничего не продано. Я ищу людей, которые делают эту работу, чтобы они сказали, где я ошибся.</p>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">The demo</span><span class="ru">Демо</span></div>
+    <h2 class="en">A full quarter, in your browser, in about ten minutes.</h2>
+    <h2 class="ru">Целый квартал, в браузере, примерно за десять минут.</h2>
+    <p class="en">Four-partner consortium, EU-funded, 3.8 million euro action. Drop in the documents, watch the reporting form get built from the donor’s rules, file a partner return that has two of its own sources disagreeing, sit in the reviewer’s chair, consolidate, and hand the result over. Nothing to install, no sign-up.</p>
+    <p class="ru">Консорциум из четырёх партнёров, финансирование ЕС, действие на 3,8 млн евро. Загрузите документы, посмотрите, как форма собирается из правил донора, сдайте отчёт партнёра, у которого два собственных источника расходятся, сядьте в кресло ревьюера, сведите отчёт и передайте его донору. Ничего не нужно устанавливать, регистрация не требуется.</p>
+    <div class="figure" style="margin-top:20px">
+      <div class="head"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="small mono">vizier4dev — Q1 · Cold Chain for Rural Clinics</span></div>
+      <div class="body">
+        <div class="numrow">
+          <div class="num"><b>€81,300</b><span class="en">declared this period</span><span class="ru">заявлено за период</span></div>
+          <div class="num" style="border-color:var(--bad-line)"><b style="color:var(--bad)">€36,000</b><span class="en">would not survive an audit today</span><span class="ru">не пережило бы аудит сегодня</span></div>
+          <div class="num"><b>€23,500</b><span class="en">evidence complete, linked to an output</span><span class="ru">подтверждения полные, привязка к результату есть</span></div>
+        </div>
+        <p class="small en" style="margin:14px 0 0">Figures from the demo’s fictional programme. The middle number is the one the rest of this page is about.</p>
+        <p class="small ru" style="margin:14px 0 0">Цифры из выдуманной программы в демо. Вся остальная страница — про среднюю из них.</p>
+      </div>
+    </div>
+    <div class="cta-row"><a class="btn" href="index.html"><span class="en">Open the demo</span><span class="ru">Открыть демо</span></a></div>
+  </div>
+</section>
+
+<section id="problem">
+  <div class="wrap narrow">
+    <div class="eyebrow"><span class="en">The problem</span><span class="ru">Проблема</span></div>
+    <h2 class="en">Every quarter, the same loop, run by the person you can least afford to lose.</h2>
+    <h2 class="ru">Каждый квартал один и тот же круг, и крутит его человек, которого вы меньше всего можете потерять.</h2>
+    <p class="en">Someone builds the reporting template in Word and Excel. It goes out by email. It comes back in every shape a spreadsheet can take. One MEL officer reconciles it by hand, chases the missing breakdown, hunts for the document behind each number, rewrites the narrative twice, and files it. By then the data is too old to change anything, and next quarter it starts again.</p>
+    <p class="ru">Кто-то собирает форму отчётности в Word и Excel. Она уходит по почте. Возвращается во всех видах, которые может принять таблица. Один MEL-специалист сводит это руками, выпрашивает недостающую разбивку, ищет документ за каждой цифрой, дважды переписывает текст и сдаёт. К этому моменту данные уже поздно на что-то влиять, а в следующем квартале всё повторяется.</p>
+    <p class="en">That is the part everyone talks about. The expensive part is quieter: the costs behind those figures. Audits of EU-funded work keep landing on the same findings — personnel costs with no reliable time record, procurement above the threshold with no documented comparison of offers, costs nobody can tie to an output. Those come back as money you have to return.</p>
+    <p class="ru">Об этой части говорят все. Дорогая часть тише: расходы за этими цифрами. Аудиты проектов, финансируемых ЕС, раз за разом упираются в одно и то же — расходы на персонал без надёжного учёта времени, закупки выше порога без задокументированного сравнения предложений, расходы, которые никто не может привязать к результату. Это возвращается как деньги, которые нужно вернуть.</p>
+    <p class="small en">Sources for that list: the European Commission’s <a href="https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/common/guidance/indicative-audit-programme_en.pdf">indicative audit programme</a>, and practitioner write-ups of <a href="https://euro-funding.com/en/blog/common-mistakes-in-the-financial-reporting-of-eu-funded-projects/">the mistakes that recur in financial reporting</a>.</p>
+    <p class="small ru">Источники этого списка: <a href="https://ec.europa.eu/info/funding-tenders/opportunities/docs/2021-2027/common/guidance/indicative-audit-programme_en.pdf">индикативная программа аудита Еврокомиссии</a> и разборы практиков о <a href="https://euro-funding.com/en/blog/common-mistakes-in-the-financial-reporting-of-eu-funded-projects/">повторяющихся ошибках финансовой отчётности</a>.</p>
+    <blockquote class="en">Results tell the donor what happened. Cost lines are what gets audited. Most reporting tools only do the first half.</blockquote>
+    <blockquote class="ru">Результаты говорят донору, что произошло. Аудит проверяет строки расходов. Большинство инструментов отчётности делают только первую половину.</blockquote>
+  </div>
+</section>
+
+<section class="alt" id="how">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">How it works</span><span class="ru">Как это работает</span></div>
+    <h2 class="en">Six steps, and the donor’s rules carry through all of them.</h2>
+    <h2 class="ru">Шесть шагов, и правила донора проходят через каждый.</h2>
+    <div class="grid g2" style="margin-top:22px">
+      <div class="card flat">
+        <div class="step"><span class="n">01</span><div>
+          <h3 class="en">Bring in what already governs the action</h3><h3 class="ru">Загрузите то, что уже управляет действием</h3>
+          <p class="muted en">The call, the proposal, the results framework, the budget, the reporting guidelines. Any format. Nothing gets re-keyed.</p>
+          <p class="muted ru">Конкурс, заявка, рамка результатов, бюджет, правила отчётности. Любой формат. Ничего не перенабирается.</p></div></div>
+        <div class="step"><span class="n">02</span><div>
+          <h3 class="en">Each rule is bound to a field</h3><h3 class="ru">Каждое правило привязывается к полю</h3>
+          <p class="muted en">Disaggregation on person-level indicators, numerator and denominator on every percentage, a named means of verification, the ten per cent deviation rule. The form is generated from those bindings, and you edit it like a document.</p>
+          <p class="muted ru">Дизагрегация по показателям о людях, числитель и знаменатель у каждого процента, названный способ проверки, правило десяти процентов отклонения. Форма генерируется из этих связей, и вы правите её как документ.</p></div></div>
+        <div class="step"><span class="n">03</span><div>
+          <h3 class="en">Partners file, and the figures are checked as they type</h3><h3 class="ru">Партнёры заполняют, а цифры проверяются при вводе</h3>
+          <p class="muted en">A numerator above its denominator, a breakdown that does not reconcile with the total, a percentage below the floor in the framework, a narrative too thin to use. And when two of a partner’s own files disagree, both figures are put side by side with the reason to pick one.</p>
+          <p class="muted ru">Числитель больше знаменателя, разбивка не сходится с итогом, процент ниже порога из рамки результатов, текст слишком пустой, чтобы его использовать. А когда два собственных файла партнёра расходятся, обе цифры ставятся рядом с основанием выбрать одну.</p></div></div>
+      </div>
+      <div class="card flat">
+        <div class="step"><span class="n">04</span><div>
+          <h3 class="en">Cost lines are checked against audit findings</h3><h3 class="ru">Строки расходов проверяются по находкам аудита</h3>
+          <p class="muted en">Missing timesheet, missing payroll record, no contract or comparison of offers above the threshold, a cost dated outside the period, a cost not linked to any output, a bonus that is not eligible at all. Each one carries the sentence an auditor would write.</p>
+          <p class="muted ru">Нет табеля, нет расчётного листа, выше порога нет договора или сравнения предложений, дата вне периода, нет привязки к результату, премия, которая вообще неприемлема. К каждой строке приложена формулировка, которую написал бы аудитор.</p></div></div>
+        <div class="step"><span class="n">05</span><div>
+          <h3 class="en">Hand it over in the donor’s structure</h3><h3 class="ru">Передайте в структуре донора</h3>
+          <p class="muted en">Donors take an encoded logframe in their results system or a structured interim form, not a document. Vizier4Dev assembles both from the approved figures, and refuses to submit while an indicator is unmapped or a mandatory sub-chapter is empty.</p>
+          <p class="muted ru">Донор принимает закодированную логфрейм-таблицу в своей системе результатов или структурированную промежуточную форму, а не документ. Vizier4Dev собирает обе из одобренных цифр и не даст сдать, пока показатель не сопоставлен или обязательный подраздел пуст.</p></div></div>
+        <div class="step"><span class="n">06</span><div>
+          <h3 class="en">The queue tells you what is left</h3><h3 class="ru">Очередь показывает, что осталось</h3>
+          <p class="muted en">One column, rebuilt from the rules and the state of the period, different for the lead, the partner and the reviewer. It is the whole product in one place: what needs you next, and why.</p>
+          <p class="muted ru">Одна колонка, которая пересобирается из правил и состояния периода и выглядит по-разному для ведущей организации, партнёра и ревьюера. Это весь продукт в одном месте: что нужно от вас дальше и почему.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="costs">
+  <div class="wrap narrow">
+    <div class="eyebrow"><span class="en">The half nobody shows</span><span class="ru">Половина, которую никто не показывает</span></div>
+    <h2 class="en">The second number.</h2>
+    <h2 class="ru">Вторая цифра.</h2>
+    <p class="en">Every reporting tool will tell you what you spent. Vizier4Dev also tells you what would not survive a check today, line by line, with the finding attached and the missing document named. Attach the timesheet and the number drops. Take an ineligible bonus off the claim and the reason is recorded.</p>
+    <p class="ru">Любой инструмент отчётности скажет, сколько вы потратили. Vizier4Dev говорит ещё и то, что не пережило бы проверку сегодня: построчно, с формулировкой находки и названием недостающего документа. Приложили табель — цифра упала. Сняли неприемлемую премию с претензии — причина записана.</p>
+    <p class="en">Behind it sits an append-only record of who changed what and when — the thing an auditor asks for when a figure moves after submission. It assembles into a folder: the cost ledger, the attached documents, the trail, and a cover note listing what is still missing.</p>
+    <p class="ru">За этим стоит журнал только на добавление: кто, что и когда изменил — именно это спрашивает аудитор, когда цифра меняется после сдачи. Всё это собирается в папку: реестр расходов, приложенные документы, след изменений и записка с тем, чего не хватает.</p>
+    <p class="small en">The checks in the demo follow the published audit findings linked above. Thresholds and the reporting period come from your own grant agreement, so they change per action.</p>
+    <p class="small ru">Проверки в демо построены по опубликованным находкам аудита, ссылки на которые выше. Пороги и отчётный период берутся из вашего грантового соглашения, поэтому меняются от действия к действию.</p>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">Who it is for</span><span class="ru">Для кого</span></div>
+    <h2 class="en">People who own the deadline.</h2>
+    <h2 class="ru">Те, на ком висит срок.</h2>
+    <div class="grid g2" style="margin-top:20px">
+      <div>
+        <ul class="list en">
+          <li>MEL consultants and small agencies brought in for the reporting period</li>
+          <li>Consortium leads carrying the donor relationship and the audit risk</li>
+          <li>MEL and programme staff who consolidate three or four partner returns</li>
+        </ul>
+        <ul class="list ru">
+          <li>MEL-консультанты и небольшие агентства, которых зовут на отчётный период</li>
+          <li>Ведущие организации консорциума, на которых висят отношения с донором и риск аудита</li>
+          <li>Сотрудники MEL и программ, сводящие три-четыре отчёта партнёров</li>
+        </ul>
+      </div>
+      <div>
+        <ul class="list en">
+          <li>Finance staff who have to produce the evidence behind each cost line</li>
+          <li>Partner focal points who file the same return every quarter</li>
+          <li>Grant managers who inherit a period someone else started</li>
+        </ul>
+        <ul class="list ru">
+          <li>Финансисты, которым нужно предъявить подтверждение к каждой строке расходов</li>
+          <li>Ответственные у партнёров, сдающие один и тот же отчёт каждый квартал</li>
+          <li>Грант-менеджеры, которым достался период, начатый кем-то другим</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap narrow">
+    <div class="eyebrow"><span class="en">What it is not</span><span class="ru">Чем это не является</span></div>
+    <h2 class="en">The limits, before you spend time on it.</h2>
+    <h2 class="ru">Ограничения — до того, как вы потратите на это время.</h2>
+    <ul class="list en">
+      <li><b>Not a product yet.</b> This is a working demo on fictional data. There is no account, no storage, no service behind it.</li>
+      <li><b>Not field data collection.</b> Kobo and ActivityInfo do offline collection well. This starts where their export lands.</li>
+      <li><b>Not a place for personal data about the people you serve.</b> It works on aggregates and programme documents.</li>
+      <li><b>Not compliance certification, and not legal, financial or audit advice.</b> It shows what a check would flag; a person signs.</li>
+      <li><b>Not a replacement for your MEL officer.</b> It removes reconciliation and hunting for documents. Judgement stays with the reviewer, and nothing reaches a donor without a human approving it.</li>
+    </ul>
+    <ul class="list ru">
+      <li><b>Это ещё не продукт.</b> Это рабочее демо на выдуманных данных. За ним нет ни аккаунта, ни хранилища, ни сервиса.</li>
+      <li><b>Это не сбор данных в поле.</b> Kobo и ActivityInfo хорошо делают офлайн-сбор. Здесь работа начинается там, где заканчивается их выгрузка.</li>
+      <li><b>Это не место для персональных данных людей, которым вы помогаете.</b> Работа идёт с агрегатами и документами программы.</li>
+      <li><b>Это не заверение соответствия и не юридический, финансовый или аудиторский совет.</b> Инструмент показывает, за что зацепится проверка; подписывает человек.</li>
+      <li><b>Это не замена вашему MEL-специалисту.</b> Снимается сведение и поиск документов. Суждение остаётся за ревьюером, и ничего не уходит донору без одобрения человека.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap narrow">
+    <div class="eyebrow"><span class="en">Price</span><span class="ru">Цена</span></div>
+    <h2 class="en">What I think this should cost.</h2>
+    <h2 class="ru">Сколько это, по-моему, должно стоить.</h2>
+    <div class="todo">
+      <b class="en">Draft, not published.</b><b class="ru">Черновик, не опубликовано.</b>
+      <p class="en" style="margin:8px 0 0">Working hypothesis: <b>€250 per month per action</b> for the consultant or agency running the reporting period, billed per action rather than per user, because the number of partner focal points is not the value. A consortium lead running one action pays the same. Nobody has paid this yet, and it is a guess until someone does or refuses.
+      <br><br>Confirm the number, or delete this whole block, before this page goes anywhere public.</p>
+      <p class="ru" style="margin:8px 0 0">Рабочая гипотеза: <b>250 евро в месяц за одно действие</b> для консультанта или агентства, ведущего отчётный период. Считается за действие, а не за пользователя, потому что ценность не в числе ответственных у партнёров. Ведущая организация с одним действием платит столько же. Пока никто столько не заплатил, и это догадка, пока кто-то не заплатит или не откажется.
+      <br><br>Подтвердите цифру или удалите весь этот блок, прежде чем страница уйдёт наружу.</p>
+    </div>
+  </div>
+</section>
+
+<section id="talk">
+  <div class="wrap narrow">
+    <div class="eyebrow"><span class="en">What I actually want</span><span class="ru">Чего я хочу на самом деле</span></div>
+    <h2 class="en">Twenty minutes on how your last quarter went.</h2>
+    <h2 class="ru">Двадцать минут о том, как прошёл ваш последний квартал.</h2>
+    <p class="en">Not a demo call. I want to hear how you closed the last reporting period: who built the template, what came back from partners, what you had to chase, what the finance side asked for, and what you paid anyone to help. If the answer is that this problem is already solved for you, that is the most useful thing you can tell me.</p>
+    <p class="ru">Это не показ продукта. Я хочу услышать, как вы закрывали последний отчётный период: кто собирал форму, что вернулось от партнёров, что пришлось выпрашивать, что запросила финансовая сторона и кому вы за это платили. Если окажется, что задача у вас уже решена, это самое полезное, что вы можете мне сказать.</p>
+    <div class="todo" style="margin:18px 0">
+      <b class="en">Two things to fix before this goes public.</b><b class="ru">Две вещи, которые надо закрыть до публикации.</b>
+      <p class="en" style="margin:8px 0 0">One: the paragraph below needs your own background in your own words — how long you have worked on programme reporting and where. I will not write a biography for you. Two: the contact link points at a personal mailbox, which reads badly on a page about handling other people’s grant data. A domain address is the fix.</p>
+      <p class="ru" style="margin:8px 0 0">Первое: абзац ниже нужен вашими словами — сколько и где вы работали с программной отчётностью. Биографию за вас я писать не буду. Второе: контакт ведёт на личный почтовый ящик, что плохо читается на странице про обращение с чужими грантовыми данными. Лечится адресом на домене.</p>
+    </div>
+    <p class="en"><b>Who built it.</b> <span class="muted">[Your paragraph goes here: what you have worked on, why this problem, what you have seen go wrong. Keep it to four sentences and keep the numbers real.]</span></p>
+    <p class="ru"><b>Кто это сделал.</b> <span class="muted">[Здесь ваш абзац: над чем вы работали, почему именно эта задача, что видели своими глазами. Четыре предложения, цифры настоящие.]</span></p>
+    <div class="cta-row">
+      <a class="btn" href="mailto:vassiliy.lakhonin@gmail.com?subject=Vizier4Dev"><span class="en">Write to me</span><span class="ru">Напишите мне</span></a>
+      <a class="btn ghost" href="index.html"><span class="en">Open the demo first</span><span class="ru">Сначала открыть демо</span></a>
+    </div>
+  </div>
+</section>
+
+<footer><div class="wrap">
+  <div class="wordmark" style="font-size:17px;margin-bottom:8px">Vizier<i>4dev</i></div>
+  <p class="small en" style="margin:0">Demo data is fictional. The programme, the partners, the figures and the audit findings shown in the demo are invented for demonstration. Not legal, financial, compliance or audit advice. Human review is required before anything is filed with a donor.</p>
+  <p class="small ru" style="margin:0">Данные в демо выдуманы. Программа, партнёры, цифры и находки аудита в демо созданы для демонстрации. Это не юридический, финансовый, комплаенс- или аудиторский совет. Прежде чем что-либо уйдёт донору, это должен проверить человек.</p>
+  <p class="small" style="margin:10px 0 0"><a href="index.html"><span class="en">Demo</span><span class="ru">Демо</span></a> · <a href="mailto:vassiliy.lakhonin@gmail.com"><span class="en">Contact</span><span class="ru">Контакт</span></a></p>
+</div></footer>
+
+<script>
+function setLang(l){
+  document.body.classList.toggle('lang-ru',l==='ru');
+  document.documentElement.lang=l;
+  document.getElementById('l-en').classList.toggle('active',l==='en');
+  document.getElementById('l-ru').classList.toggle('active',l==='ru');
+  try{localStorage.setItem('v4d_lang',l);}catch(e){}
+}
+setLang(localStorage.getItem('v4d_lang')||((navigator.language||'en').slice(0,2)==='ru'?'ru':'en'));
+</script>
+</body>
+</html>
