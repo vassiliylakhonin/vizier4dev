@@ -35,7 +35,7 @@ Not legal, financial, compliance or audit advice. Human review is required befor
 
 ## Deployment
 
-`./deploy.sh` publishes `index.html`, `landing.html`, `robots.txt` and `_headers` to Cloudflare Pages. The repository itself stays private; only those four files are served.
+`./deploy.sh` publishes `index.html`, `landing.html`, `robots.txt` and `_headers` to Cloudflare Pages. Only those four files are served; nothing else in the repository is.
 
 It runs on the `wrangler` login already present on the machine, so there is no API token to create and no secret to store anywhere. A `pre-push` hook runs it whenever `main` is pushed; delete `.git/hooks/pre-push` to go back to publishing by hand.
 

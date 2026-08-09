@@ -3,7 +3,7 @@
 #
 # Uses the wrangler login already on this machine, so there is no API token
 # to create and no secret to store. Only the four files copied below are
-# served; the repository itself stays private.
+# served; nothing else in the repository is.
 
 set -eu
 
