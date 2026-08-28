@@ -45,3 +45,7 @@ The published site is closed to search engines — `robots.txt` disallows crawli
 
 - The founder paragraph and the price block on `landing.html` are marked as drafts. They must be filled in or removed before the page is shown to anyone outside a working conversation.
 - The contact link points at a personal mailbox; a domain address is the fix.
+
+## License
+
+[MIT](LICENSE)
