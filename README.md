@@ -2,6 +2,8 @@
 
 Quarterly reporting workspace for grant-funded consortia. Two self-contained HTML files, no build step, no dependencies, no network calls.
 
+[![Vizier4Dev workspace preview](assets/vizier-preview.png)](https://vizier4dev.pages.dev/)
+
 - `index.html` — the demo workspace. Open it in a browser.
 - `landing.html` — the public page describing it, linking to the demo.
 
@@ -35,11 +37,26 @@ Not legal, financial, compliance or audit advice. Human review is required befor
 
 ## Deployment
 
-`./deploy.sh` publishes `index.html`, `landing.html`, `robots.txt` and `_headers` to Cloudflare Pages. Only those four files are served; nothing else in the repository is.
+`./deploy.sh` validates and publishes `index.html`, `landing.html`, `robots.txt` and `_headers` to Cloudflare Pages. Only those four files are served; nothing else in the repository is.
 
-It runs on the `wrangler` login already present on the machine, so there is no API token to create and no secret to store anywhere. A `pre-push` hook runs it whenever `main` is pushed; delete `.git/hooks/pre-push` to go back to publishing by hand.
+Locally it uses the existing `wrangler` login. The manual GitHub Actions workflow
+`.github/workflows/deploy.yml` uses the repository secrets
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, making the deployment path
+reproducible without relying on an untracked local Git hook.
 
-The published site is closed to search engines — `robots.txt` disallows crawling and `_headers` sends `X-Robots-Tag: noindex, nofollow, noarchive`. It is reachable by anyone holding the address, so treat the address as the access control it is.
+The published site is closed to search engines — `robots.txt` disallows crawling
+and `_headers` sends `X-Robots-Tag`. The same file sets CSP, content-type,
+referrer, permissions, and opener policies. It is still reachable by anyone
+holding the address, so the demo contains fictional data only.
+
+## Checks
+
+```bash
+python3 scripts/check_static.py
+```
+
+CI verifies both pages, their local links, bilingual contract, absence of network
+APIs/external scripts, and the required response headers.
 
 ## Open items
 

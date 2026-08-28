@@ -952,9 +952,9 @@ function render(){
 VIEW.sources=function(){
  if(!S.ingested){
   return head('Sources','Drop in the documents that already govern this programme. Vizier reads them as they are — no template to fill in first.')
-  +panel(`<button type="button" class="dz" onclick="ingest()"><div style="font-family:var(--serif);font-size:17px">Drop the project documents here</div>
+  +panel(`<div class="dz"><div style="font-family:var(--serif);font-size:17px">Drop the project documents here</div>
     <div class="small" style="margin-top:5px">Call · proposal · results framework · budget · donor guidelines · partner logs</div>
-    <div style="margin-top:14px"><button class="btn">Load the demo set</button></div></div>
+    <div style="margin-top:14px"><button type="button" class="btn" onclick="ingest()">Load the demo set</button></div></div>
     <div id="prog" class="small" style="margin-top:13px"></div>`)
   +panel(`<h2>What happens to them</h2><div class="grid g3">
      <div><div class="lbl">Read</div><div class="small">Indicators, baselines, targets, budget headings, deadlines and the donor’s reporting rules.</div></div>
