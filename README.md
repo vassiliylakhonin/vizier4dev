@@ -15,11 +15,18 @@ A reporting period for a four-partner, EU-funded action, run end to end:
 2. **Framework** — indicators, targets, budget headings and six donor rules are extracted, and each rule is bound to the field it will police.
 3. **Collection** — partners file results and cost lines. Figures are checked while they are typed: disaggregation that does not reconcile, a numerator above its denominator, a percentage below the framework floor, a narrative too thin to use, and two of a partner's own sources disagreeing on the same total.
 4. **Costs and audit** — cost lines are checked against documented reasons costs are declared ineligible: personnel time with no signed timesheet, procurement above the threshold with no comparison of offers, a cost dated outside the period, a cost not linked to any output, a bonus that is not eligible. The screen carries two numbers: what was declared, and what would not survive a check today.
-5. **Reporting** — narrative drafted from the same data, reviewer comments routed to the exact line, consolidation once all returns are approved.
-6. **Hand-over** — the approved figures are encoded for a donor results system (with an indicator-mapping gate) or assembled into a structured interim form with its sub-chapters.
-7. **Signals and funding** — control room, learning questions, and a funding pipeline with a draft-proposal review.
+5. **Partner boundary** — each partner checks its own evidence where it sits and sends the verdict, not the file. The sign-in sheets, payroll, invoices and registers stay at the organisation holding them; what crosses is the figures the donor asks for, the status of each local check in one of four words, and a digest binding the figure to the evidence it was checked against. A gap opens a second round of a few dozen bytes rather than a folder. The screen counts both sides — what crossed, and what did not.
+6. **Reporting** — narrative drafted from the same data, reviewer comments routed to the exact line, consolidation once all returns are approved.
+7. **Hand-over** — the approved figures are encoded for a donor results system (with an indicator-mapping gate) or assembled into a structured interim form with its sub-chapters.
+8. **Signals and funding** — control room, learning questions, and a funding pipeline with a draft-proposal review.
 
 A role switcher (lead / partner / MEL reviewer) changes both permissions and the work queue on the left, which is rebuilt from the donor rules and the state of the period.
+
+### On the boundary
+
+A consortium that mails spreadsheets has already transferred everything, and the only question left is who bothers to read it. The claim the boundary makes is narrower and checkable: this many bytes left the building, and no others.
+
+The digest lets the lead tell that a partner has not changed a register underneath an approved return. It does not prove the register was right in the first place, does not establish who compiled it, and is not an audit — a donor auditor still visits the partner and reads the file. The check verdicts cross as fixed words (`MET`, `NOT_MET`, `UNKNOWN`, `NOT_APPLICABLE`) so there is nothing for prose to soften on the way out.
 
 ## Languages
 
