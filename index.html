@@ -523,6 +523,168 @@ let LQS=[...LEARNING_Q], PLQ=['How is the alarm-response routine landing with cl
 const S={persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
          consolidated:false,reviewTarget:'',propReviewed:false,curFit:PROP_REVIEW.fit};
 
+/* ========================== PARTNER BOUNDARY ============================ */
+/* Each partner is a silo. Its primary documents — sign-in sheets with names,
+   payroll, invoices, contracts — never leave the organisation that holds them.
+   What crosses is a typed return: the figures the donor form asks for, the
+   status of each local check, and a digest of the evidence each figure rests
+   on. The lead can tell that a figure was checked and has not moved since,
+   without ever receiving what it was checked against.
+
+   This is the part a shared folder cannot do. A consortium that mails
+   spreadsheets has already transferred everything; the only question left is
+   who bothers to read it. */
+
+/* SHA-256, synchronous and dependency-free. crypto.subtle is async and absent
+   from some file:// origins, and this page has to work opened from disk. */
+const SHA_K = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+function utf8Bytes(s){const out=[];for(const ch of s){let c=ch.codePointAt(0);
+ if(c<0x80)out.push(c);
+ else if(c<0x800)out.push(0xc0|c>>6,0x80|c&63);
+ else if(c<0x10000)out.push(0xe0|c>>12,0x80|c>>6&63,0x80|c&63);
+ else out.push(0xf0|c>>18,0x80|c>>12&63,0x80|c>>6&63,0x80|c&63);}
+ return out;}
+function sha256(text){
+ const msg=utf8Bytes(text),bitLen=msg.length*8;
+ msg.push(0x80);while(msg.length%64!==56)msg.push(0);
+ for(let i=7;i>=0;i--)msg.push(Math.floor(bitLen/Math.pow(2,i*8))&255);
+ let h=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+ const rr=(x,n)=>(x>>>n)|(x<<(32-n));
+ const w=new Array(64);
+ for(let i=0;i<msg.length;i+=64){
+  for(let t=0;t<16;t++)w[t]=(msg[i+t*4]<<24|msg[i+t*4+1]<<16|msg[i+t*4+2]<<8|msg[i+t*4+3])>>>0;
+  for(let t=16;t<64;t++){
+   const s0=rr(w[t-15],7)^rr(w[t-15],18)^(w[t-15]>>>3),s1=rr(w[t-2],17)^rr(w[t-2],19)^(w[t-2]>>>10);
+   w[t]=(w[t-16]+s0+w[t-7]+s1)>>>0;}
+  let [a,b,c,d,e,f,g,hh]=h;
+  for(let t=0;t<64;t++){
+   const S1=rr(e,6)^rr(e,11)^rr(e,25),ch=(e&f)^(~e&g),t1=(hh+S1+ch+SHA_K[t]+w[t])>>>0;
+   const S0=rr(a,2)^rr(a,13)^rr(a,22),mj=(a&b)^(a&c)^(b&c),t2=(S0+mj)>>>0;
+   hh=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;}
+  h=[h[0]+a,h[1]+b,h[2]+c,h[3]+d,h[4]+e,h[5]+f,h[6]+g,h[7]+hh].map(x=>x>>>0);}
+ return h.map(x=>x.toString(16).padStart(8,'0')).join('');}
+function digestOf(text){return sha256(text).slice(0,16);}
+function byteLen(s){return utf8Bytes(s).length;}
+/* ---------------------------- the silos --------------------------------- */
+/* What each partner holds and does not send. Sizes are the demo's own fiction,
+   but the shape is not: the bulk of a consortium's evidence is person-level,
+   and person-level evidence is the part that must not travel. */
+const SILO={
+ 'Terrace Health Trust':{short:'THT',docs:[
+  {n:'Clinic commissioning sign-off sheets (96)',kb:2140,pd:true},
+  {n:'Certification register — Q1',kb:860,pd:true},
+  {n:'Maintenance team rosters',kb:180,pd:true},
+  {n:'Procurement file — refrigerators',kb:3400,pd:false}]},
+ 'Riverbend Community Care':{short:'RCC',docs:[
+  {n:'Session sign-in sheets, raw (1,140 rows)',kb:1180,pd:true},
+  {n:'Certification register, deduplicated',kb:640,pd:true},
+  {n:'Feedback log — Q1',kb:410,pd:true},
+  {n:'Payroll and timesheets — Q1',kb:2260,pd:true},
+  {n:'Invoices and contracts — Q1 claim',kb:5900,pd:false}]},
+ 'Summit Logistics Cooperative':{short:'SLC',docs:[
+  {n:'Driver and handler certification log',kb:520,pd:true},
+  {n:'Dispatch records — Q1',kb:2980,pd:false},
+  {n:'Rosters — Q1',kb:150,pd:true},
+  {n:'Fuel invoices — northern route',kb:1120,pd:false}]},
+};
+function siloKb(p){return (SILO[p]?.docs||[]).reduce((a,d)=>a+d.kb,0);}
+function siloPersonal(p){return (SILO[p]?.docs||[]).filter(d=>d.pd).length;}
+
+/* ------------------------- the local filter ------------------------------ */
+/* Runs inside the partner. The donor's rules are applied where the evidence
+   is, and only the verdict travels. A status is one of four words, so there is
+   nothing for a model to embroider on the way out. */
+const LOCAL_CHECKS={
+ 'OP3.1':[
+  {id:'disaggregation',ask:'Sex, age band and disability present'},
+  {id:'reconciliation',ask:'Female + male reconciles with the total'},
+  {id:'deduplication',ask:'Attendance deduplicated to certified people'}],
+ 'CC1':[
+  {id:'ratio',ask:'Numerator and denominator both supplied'},
+  {id:'ratio_sane',ask:'Numerator does not exceed the denominator'}],
+ 'OC2.2':[
+  {id:'ratio',ask:'Numerator and denominator both supplied'},
+  {id:'narrative',ask:'Barriers noted in usable prose'}],
+ 'OP1.3':[
+  {id:'inclusion_floor',ask:'Female membership at or above the 40% floor'}],
+};
+function localCheck(p,ind,id,v){
+ const n=x=>parseInt((x||'').toString().replace(/[^0-9]/g,''))||0;
+ if(id==='disaggregation')return ['Female','Male','Under-30','Health workers with disability'].every(k=>v[k])?'MET':'NOT_MET';
+ if(id==='reconciliation'){const t=n(v['Total certified (in-period)']),f=n(v['Female']),m=n(v['Male']);
+  if(!t||!f||!m)return 'UNKNOWN';return Math.abs(t-(f+m))<=1?'MET':'NOT_MET';}
+ if(id==='deduplication')return p==='Riverbend Community Care'?'MET':'NOT_APPLICABLE';
+ if(id==='ratio'){const k=Object.keys(v),num=k.find(x=>/numerator/i.test(x)),den=k.find(x=>/denominator/i.test(x));
+  return num&&den&&v[num]&&v[den]?'MET':'NOT_MET';}
+ if(id==='ratio_sane'){const k=Object.keys(v),num=k.find(x=>/numerator/i.test(x)),den=k.find(x=>/denominator/i.test(x));
+  if(!num||!den)return 'UNKNOWN';return n(v[num])<=n(v[den])?'MET':'NOT_MET';}
+ if(id==='narrative'){const t=(v['Narrative / barriers noted']||'').trim();return !t?'NOT_MET':t.length<50?'NOT_MET':'MET';}
+ if(id==='inclusion_floor'){const q=n(v['Female members (%)']);if(!q)return 'UNKNOWN';return q>=40?'MET':'NOT_MET';}
+ return 'UNKNOWN';
+}
+/* The digest binds a figure to the evidence it was checked against. The lead
+   can tell the figure has not moved since; it still cannot read what moved it. */
+function evidenceDigest(p,ind,v){return digestOf(p+'|'+ind+'|'+JSON.stringify(v)+'|'+siloKb(p));}
+
+function emitReturn(p,vals){
+ const secs=[];
+ Object.keys(LOCAL_CHECKS).forEach(ind=>{
+  const v=vals[ind];if(!v)return;
+  secs.push({ind,
+   figures:v,
+   checks:LOCAL_CHECKS[ind].map(c=>({id:c.id,status:localCheck(p,ind,c.id,v)})),
+   evidence:{held_by:SILO[p]?.short||p,documents:(SILO[p]?.docs||[]).length,digest:evidenceDigest(p,ind,v)}});
+ });
+ return {from:SILO[p]?.short||p,period:'Q1 2026',round:1,sections:secs};
+}
+/* The financial side crosses as four numbers and a list of verdicts. Cost
+   descriptions, counterparties, invoice numbers and staff names stay put. */
+function emitCosts(p,costs,flagsOf){
+ if(!costs)return null;
+ let eligible=0,atRisk=0;const byCheck={};
+ costs.forEach(c=>{const f=flagsOf(c);
+  if(f.some(x=>x.sev==='red')){atRisk+=c.a;f.filter(x=>x.sev==='red').forEach(x=>{byCheck[x.m]=(byCheck[x.m]||0)+1;});}
+  else eligible+=c.a;});
+ return {from:SILO[p]?.short||p,lines:costs.length,eligible_eur:eligible,at_risk_eur:atRisk,
+         failed_checks:Object.keys(byCheck).length};
+}
+
+/* ------------------------------ the wire -------------------------------- */
+/* Every crossing is recorded with what it weighed. The claim this demo makes
+   is not that collaboration is private in spirit; it is that this many bytes
+   left the building and no others. */
+let WIRE=[];
+function send(from,to,kind,payload,round){
+ const body=JSON.stringify(payload);
+ WIRE.push({round:round||1,from,to,kind,bytes:byteLen(body),body});
+ return WIRE[WIRE.length-1];
+}
+function wireBytes(){return WIRE.reduce((a,w)=>a+w.bytes,0);}
+function heldKb(){return Object.keys(SILO).reduce((a,p)=>a+siloKb(p),0);}
+function heldPersonal(){return Object.keys(SILO).reduce((a,p)=>a+siloPersonal(p),0);}
+
+/* Envelopes are cut when a partner files. The two other partners filed before
+   the period opened; this one's return crosses only once it is submitted. */
+let ENV_SENT={};
+function ensureEnvelopes(){
+ PARTNERS.forEach(p=>{
+  if(ENV_SENT[p]||!SILO[p])return;
+  if(p===ME&&!S.submitted)return;
+  const short=SILO[p].short;
+  send(short,'LEAD','return',emitReturn(p,partnerValues(p)),1);
+  if(p===ME){const ce=emitCosts(p,COSTS,costFlags);if(ce)send(short,'LEAD','costs',ce,1);}
+  ENV_SENT[p]=true;
+ });
+}
+
 const WS=[
  {id:'sources',label:'Sources'},
  {id:'framework',label:'Framework'},
@@ -533,7 +695,7 @@ const WS=[
 ];
 const SUBNAV={
  framework:[['model','What the donor demands'],['template','What we collect']],
- collect:[['returns','Results'],['costs','Costs'],['review','Returns in review']],
+ collect:[['returns','Results'],['costs','Costs'],['review','Returns in review'],['boundary','Partner boundary']],
  report:[['narrative','Narrative'],['financial','Financial & audit'],['consolidated','Consolidated report']],
  signals:[['control','Control room'],['learning','Learning']],
 };
@@ -634,6 +796,19 @@ function renderQueue(){
    is what gets submitted and what an auditor reads. */
 let LANG=(localStorage.getItem('v4d_lang')||((navigator.language||'en').slice(0,2)==='ru'?'ru':'en'));
 const DICT={
+"Partner boundary":"Граница партнёров",
+"Each partner checks its own evidence and sends the verdict. The documents behind the figures never leave the organisation that holds them.":"Каждый партнёр проверяет своё подтверждение сам и отправляет вердикт. Документы, стоящие за цифрами, не покидают организацию, которая их держит.",
+"Crossed the boundary":"Пересекло границу","Stayed at the partners":"Осталось у партнёров",
+"Documents with personal data":"Документов с персональными данными","none transferred":"не передано ни одного",
+"Held locally, not sent":"Хранится локально, не отправлено","Sent instead":"Отправлено вместо этого",
+"What crossed":"Что пересекло границу","What this does and does not prove":"Что это доказывает и чего не доказывает",
+"personal data":"персональные данные","held":"хранится","asked":"запрошено",
+"Ask what it rests on":"Спросить, на чём основано",
+"Round":"Раунд","From":"От","To":"Кому","Kind":"Тип","Bytes":"Байт",
+"Nothing has crossed yet. Partners file first, then what crossed can be counted.":"Границу пока ничего не пересекало. Сначала партнёры сдают отчёты, потом можно считать, что ушло.",
+"Nothing yet — this return has not been submitted, so nothing has crossed. The documents above are already here.":"Пока ничего — отчёт не сдан, границу ничто не пересекало. Документы выше и так здесь.",
+"Asking opens a second round: the silo answers with one typed record about the evidence, and the register stays where it is.":"Запрос открывает второй раунд: силос отвечает одной типизированной записью о подтверждении, а реестр остаётся на месте.",
+"The digest binds a figure to the evidence it was checked against, so the lead can tell that a partner has not changed the register underneath an approved return. It does not prove the register was right in the first place, does not identify who compiled it, and is not an audit. A donor auditor still visits the partner and reads the file.":"Дайджест связывает цифру с подтверждением, против которого её проверяли: ведущая организация может убедиться, что партнёр не подменил реестр под уже одобренным отчётом. Это не доказывает, что реестр был верен изначально, не устанавливает, кто его составил, и не является аудитом. Аудитор донора по-прежнему приезжает к партнёру и читает дело.",
 "Lead":"Ведущая","Partner":"Партнёр","MEL reviewer":"MEL-ревьюер","Tour":"Тур","Reset":"Сброс",
 "Sources":"Источники","Framework":"Рамка","Collection":"Сбор","Reporting":"Отчётность","Signals":"Сигналы","Funding":"Финансирование",
 "Nothing needs you in this period. The queue refills as partners file and the donor deadline approaches.":"Сейчас от вас ничего не требуется. Очередь наполнится, когда партнёры начнут сдавать и приблизится срок донора.",
@@ -821,6 +996,16 @@ const EVENTS={"Evidence attached":"Приложено подтверждение
 "Return submitted":"Отчёт сдан","Return approved":"Отчёт одобрен","Indicator mapped":"Показатель сопоставлен",
 "Deviation explanation drafted":"Составлено объяснение отклонения"};
 const RX=[
+ [/^(\d+) messages$/,m=>'сообщений: '+m[1]],
+ [/^(\d+) silos$/,m=>'силосов: '+m[1]],
+ [/^What stayed at (.+)$/,m=>'Что осталось у '+m[1]],
+ [/^A consortium that mails spreadsheets has already transferred everything, and the only question left is who reads it\. Here the ratio is the point: ([\d,]+) bytes of typed verdicts against ([\d,]+) KB of evidence that did not move\.$/,m=>'Консорциум, который рассылает таблицы по почте, уже передал всё, и остаётся только вопрос, кто это прочтёт. Здесь важно соотношение: '+m[1]+' байт типизированных вердиктов против '+m[2]+' КБ подтверждений, которые никуда не двинулись.'],
+ [/^(\d+) documents, ([\d,]+) KB, (\d+) of them carrying personal data\. None of it crossed\. The checks below ran where the evidence is; only their verdict and a digest were sent\.$/,m=>'Документов: '+m[1]+', '+m[2]+' КБ, из них с персональными данными: '+m[3]+'. Ничего из этого не пересекало границу. Проверки ниже отработали там, где лежит подтверждение; ушли только их вердикт и дайджест.'],
+ [/^(\d+) line\(s\) queried in a second round\. Each answer was a typed record, not a document\.$/,m=>'Строк, запрошенных во втором раунде: '+m[1]+'. Каждый ответ — типизированная запись, а не документ.'],
+ [/^Answered in round 2: (\w+), (\d+) documents held(, deduplicated)?\.$/,m=>'Ответ во втором раунде: '+m[1]+', документов на хранении: '+m[2]+(m[3]?', с исключением повторов':'')+'.'],
+ [/^Round (\d+) · ([\d,]+) bytes\. This is the whole message\.$/,m=>'Раунд '+m[1]+' · '+m[2]+' байт. Это всё сообщение целиком.'],
+ [/^Answered in (\d+) bytes\. The register stayed at (.+)\.$/,m=>'Ответ занял '+m[1]+' байт. Реестр остался у '+m[2]+'.'],
+ [/^Evidence query answered$/,m=>'Ответ на запрос подтверждения'],
  [/^(\d+) blocking$/,m=>'блокирующих: '+m[1]],
  [/^(\d+) to verify$/,m=>'на проверку: '+m[1]],
  [/^(\d+) flags?$/,m=>'замечаний: '+m[1]],
@@ -1208,11 +1393,32 @@ function reviewDetail(){
        <td style="width:1%"><button class="btn ghost sm" onclick="addComment('${attr(p)}','${attr(key)}')">Comment</button></td></tr>
        ${c.items[key]?`<tr><td colspan="3" class="small" style="color:var(--accent)">· ${esc(c.items[key])}</td></tr>`:''}`;}).join('')}
     </tbody></table>`);}).join('')
+  +boundaryPanel(p)
   +panel(`<h2>Overall comment to ${esc(p)}</h2>
     <textarea class="field" rows="3" oninput="setOverall('${attr(p)}',this.value)" placeholder="What has to change before you approve?">${esc(c.overall||'')}</textarea>
     <div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">
      <button class="btn ghost" onclick="sendComments('${attr(p)}')">Send comments</button>
      <button class="btn" onclick="approveP('${attr(p)}');closePartner()">Approve this return</button></div>`);
+}
+/* The figures above are the return: the donor asks for them and they have to
+   travel. What does not travel is the evidence they were checked against, and
+   the review screen should say so rather than implying the lead could open the
+   register. */
+function boundaryPanel(p){
+ ensureEnvelopes();
+ const s=SILO[p];if(!s)return '';
+ const env=emitReturn(p,partnerValues(p));
+ const asked=env.sections.filter(sec=>ANSWERS[p+'::'+sec.ind]).length;
+ return panel(`<h2>What stayed at ${esc(s.short)}</h2>
+  <p class="small">${s.docs.length} documents, ${fmt(siloKb(p))} KB, ${siloPersonal(p)} of them carrying personal data. None of it crossed. The checks below ran where the evidence is; only their verdict and a digest were sent.</p>
+  <table><tbody>${env.sections.map(sec=>{const a=ANSWERS[p+'::'+sec.ind];
+   return `<tr><td style="width:18%"><span class="mono">${esc(sec.ind)}</span></td>
+    <td>${sec.checks.map(c=>`<span class="tag ${c.status==='MET'?'good':c.status==='NOT_MET'?'bad':''}">${esc(c.id)} ${esc(c.status)}</span>`).join(' ')}
+     ${a?`<div class="small" style="margin-top:5px">Answered in round 2: ${esc(a.evidence_kind)}, ${a.documents} documents held${a.deduplicated?', deduplicated':''}.</div>`:''}</td>
+    <td class="mono small" style="width:1%;white-space:nowrap">${esc(sec.evidence.digest)}</td>
+    <td style="width:1%">${a?'<span class="tag good">asked</span>':`<button class="btn ghost sm" onclick="askEvidence('${attr(p)}','${attr(sec.ind)}')">Ask what it rests on</button>`}</td></tr>`;}).join('')}
+  </tbody></table>
+  <p class="small" style="margin-top:11px">${asked?asked+' line(s) queried in a second round. Each answer was a typed record, not a document.':'Asking opens a second round: the silo answers with one typed record about the evidence, and the register stays where it is.'}</p>`);
 }
 function setOverall(p,v){COMMENTS[p]=COMMENTS[p]||{overall:'',items:{}};COMMENTS[p].overall=v;}
 function addComment(p,key){const t=prompt('Comment for the partner on this line:');if(t==null||!t.trim())return;
@@ -1220,6 +1426,68 @@ function addComment(p,key){const t=prompt('Comment for the partner on this line:
 function sendComments(p){const c=COMMENTS[p]||{items:{}};const n=Object.keys(c.items||{}).length+(c.overall?1:0);
  toast('Sent '+n+' comment'+(n===1?'':'s')+' to '+p+' — they appear against the exact line in their own form.');}
 function consolidate(){S.consolidated=true;go('report','consolidated');toast('Consolidated. Every figure traces back to a partner return.');}
+
+/* ------------------------------ round two ------------------------------- */
+/* A gap does not open the folder. The lead names one line; the silo answers
+   with one typed record about the evidence behind it. The register itself
+   stays where it was. */
+const EVIDENCE_KIND={'OP3.1':'certification_register','CC1':'feedback_log','OC2.2':'perception_survey','OP1.3':'team_roster'};
+let ANSWERS={};
+function askEvidence(p,ind){
+ const short=SILO[p]?.short||p, vals=partnerValues(p)[ind]||{};
+ send('LEAD',short,'query',{round:2,ind,ask:'evidence_basis'},2);
+ const rows=Object.keys(vals).length;
+ const answer={round:2,ind,evidence_kind:EVIDENCE_KIND[ind]||'source_record',
+  documents:(SILO[p]?.docs||[]).length,deduplicated:p===ME,
+  digest:evidenceDigest(p,ind,vals),fields_backed:rows};
+ send(short,'LEAD','answer',answer,2);
+ ANSWERS[p+'::'+ind]=answer;
+ logEvent('Evidence query answered',short+' → '+ind);
+ render();toast('Answered in '+byteLen(JSON.stringify(answer))+' bytes. The register stayed at '+short+'.');
+}
+function boundaryReady(){return WIRE.length>0;}
+function openWire(w){
+ modal(`<b>${esc(w.kind)} — ${esc(w.from)} → ${esc(w.to)}</b>
+  <p class="small">Round ${w.round} · ${fmt(w.bytes)} bytes. This is the whole message.</p>
+  <div class="doc-body">${esc(JSON.stringify(JSON.parse(w.body),null,1))}</div>`,'640px');
+}
+
+/* ------------------------------ the view -------------------------------- */
+VIEW.boundary=function(){
+ ensureEnvelopes();
+ if(!boundaryReady())return head('Partner boundary')
+  +locked('Nothing has crossed yet. Partners file first, then what crossed can be counted.','collect','review','Go to review');
+ const crossed=wireBytes(),held=heldKb();
+ return head('Partner boundary','Each partner checks its own evidence and sends the verdict. The documents behind the figures never leave the organisation that holds them.')
+  +panel(`<div class="grid g3">
+    ${stat('Crossed the boundary',fmt(crossed)+' B',WIRE.length+' messages')}
+    ${stat('Stayed at the partners',fmt(held)+' KB',Object.keys(SILO).length+' silos')}
+    ${stat('Documents with personal data',heldPersonal(),'none transferred')}</div>
+   <p class="small" style="margin-top:11px">A consortium that mails spreadsheets has already transferred everything, and the only question left is who reads it. Here the ratio is the point: ${fmt(crossed)} bytes of typed verdicts against ${fmt(held)} KB of evidence that did not move.</p>`)
+  +PARTNERS.map(p=>{const s=SILO[p];if(!s)return '';
+    const env=emitReturn(p,partnerValues(p));
+    return panel(`<div style="display:flex;gap:9px;align-items:center;margin-bottom:9px">
+      <span class="tag acc mono">${esc(s.short)}</span><b>${esc(p)}</b></div>
+     <div class="lbl">Held locally, not sent</div>
+     <table><tbody>${s.docs.map(d=>`<tr><td>${esc(d.n)}</td>
+       <td class="mono" style="width:1%;white-space:nowrap">${fmt(d.kb)} KB</td>
+       <td style="width:1%">${d.pd?'<span class="tag warn">personal data</span>':'<span class="tag">held</span>'}</td></tr>`).join('')}
+      </tbody></table>
+     <div class="lbl" style="margin-top:13px">Sent instead</div>
+     ${env.sections.length?'':'<p class="small">Nothing yet — this return has not been submitted, so nothing has crossed. The documents above are already here.</p>'}
+     <table><tbody>${env.sections.map(sec=>`<tr><td style="width:22%"><span class="mono">${esc(sec.ind)}</span></td>
+       <td>${sec.checks.map(c=>`<span class="tag ${c.status==='MET'?'good':c.status==='NOT_MET'?'bad':''}">${esc(c.id)} ${esc(c.status)}</span>`).join(' ')}</td>
+       <td class="mono small" style="width:1%;white-space:nowrap">${esc(sec.evidence.digest)}</td></tr>`).join('')}
+      </tbody></table>`);}).join('')
+  +panel(`<h2>What crossed</h2>
+    <table><thead><tr><th>Round</th><th>From</th><th>To</th><th>Kind</th><th>Bytes</th><th></th></tr></thead>
+    <tbody>${WIRE.map((w,i)=>`<tr><td class="mono">${w.round}</td><td class="mono">${esc(w.from)}</td>
+      <td class="mono">${esc(w.to)}</td><td>${esc(w.kind)}</td><td class="mono">${fmt(w.bytes)}</td>
+      <td style="width:1%"><button class="btn ghost sm" onclick="openWire(WIRE[${i}])">Open</button></td></tr>`).join('')}
+    </tbody></table>`)
+  +panel(`<h2>What this does and does not prove</h2>
+    <p class="small">The digest binds a figure to the evidence it was checked against, so the lead can tell that a partner has not changed the register underneath an approved return. It does not prove the register was right in the first place, does not identify who compiled it, and is not an audit. A donor auditor still visits the partner and reads the file.</p>`);
+};
 
 /* ============================ COSTS & AUDIT ============================= */
 /* Every rule below mirrors a documented audit finding: personnel costs without reliable
@@ -1714,7 +1982,7 @@ function endTour(){document.getElementById('coach').classList.add('hidden');ti=-
 function resetDemo(){
  TPL=defaultTemplate();NARRATIVE=defaultNarr();SUB={};VERIFY={};COMMENTS={};APPROVED={};
  LQS=[...LEARNING_Q];PLQ=['How is the alarm-response routine landing with clinic staff?'];PIPELINE=[];
- COSTS=defaultCosts();LEDGER=[];MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
+ COSTS=defaultCosts();LEDGER=[];WIRE=[];ENV_SENT={};ANSWERS={};MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
  Object.assign(S,{persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
   consolidated:false,reviewTarget:'',propReviewed:false,curFit:PROP_REVIEW.fit});
  ['lead','partner','mel'].forEach(x=>{const b=document.getElementById('p-'+x);
