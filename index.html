@@ -209,6 +209,8 @@ button.handle:hover{color:var(--ink);background:var(--line-2);}
 
 <input type="file" id="progfile" class="hidden" accept="application/json,.json"
        aria-label="Programme file" onchange="readProgramme(this)"/>
+<input type="file" id="returnfile" class="hidden" accept="application/json,.json"
+       aria-label="Partner return file" onchange="readReturn(this)"/>
 <div id="toast" class="hidden" role="status" aria-live="polite"></div>
 <div id="coach" class="hidden" role="region" aria-label="Guided tour"></div>
 
@@ -441,6 +443,11 @@ function demoTemplate(){return{
  sections:[
   {ind:'OP3.1',title:'Health workers trained and certified',why:'Donor rule: person-level indicators must be disaggregated by sex, age band and disability.',anchor:'All "people" indicators MUST be disaggregated',
    reconcile:{total:'Total certified (in-period)',parts:['Female','Male'],tol:1},
+   /* Whether attendance was reduced to certified people is a judgement made
+      inside the partner that holds the register. It crosses as that partner's
+      attestation, and says so. */
+   localChecks:[{id:'deduplication',ask:'Attendance deduplicated to certified people',
+     appliesTo:['Riverbend Community Care'],status:'MET'}],
    fields:[{l:'Total certified (in-period)',t:'number',req:true},{l:'Female',t:'number',req:true},{l:'Male',t:'number',req:true},
            {l:'Under-30',t:'number',req:true},{l:'Health workers with disability',t:'number',req:true},
            {l:'Means of verification',t:'text',req:true},{l:'Evidence',t:'file',req:false}]},
@@ -777,7 +784,7 @@ function periodPackage(){
  return{schema:PERIOD_SCHEMA,exportedAt:new Date().toISOString(),
   programme:{id:PROG.id,title:PROG.title,mode:PROG.mode},period:clone(PERIOD),
   partners:clone(PARTNERS),returns:clone(SUB),localVerdicts:clone(VERIFY),
-  approved:clone(APPROVED),comments:clone(COMMENTS),costs:clone(COSTS),
+  approved:clone(APPROVED),comments:clone(COMMENTS),costs:clone(COSTS),received:clone(RECEIVED),
   mapping:clone(MAPPING),narrative:clone(NARRATIVE),crossed:clone(WIRE),ledger:clone(LEDGER)};
 }
 function fileStem(){return (PROG.id||'programme').replace(/[^a-z0-9_-]+/gi,'-').toLowerCase();}
@@ -792,7 +799,7 @@ const WORK_KEY='v4d_work_v1';
 let SAVED_AT=null,SAVE_T=null;
 function workState(){
  return{v:1,at:new Date().toISOString(),programme:programmeSnapshot(),
-  period:{TPL,NARRATIVE,SUB,VERIFY,COMMENTS,APPROVED,LQS,PLQ,PIPELINE,COSTS,LEDGER,WIRE,ENV_SENT,ANSWERS,MAPPING,S}};
+  period:{TPL,NARRATIVE,SUB,VERIFY,COMMENTS,APPROVED,LQS,PLQ,PIPELINE,COSTS,LEDGER,WIRE,ENV_SENT,ANSWERS,RECEIVED,OTHER_SUB,MAPPING,S}};
 }
 function saveWork(){
  try{localStorage.setItem(WORK_KEY,JSON.stringify(workState()));SAVED_AT=new Date();}
@@ -811,6 +818,7 @@ function loadWork(){
  LQS=d.LQS||[];PLQ=d.PLQ||[];PIPELINE=d.PIPELINE||[];
  if(Array.isArray(d.COSTS))COSTS=d.COSTS;
  LEDGER=d.LEDGER||[];WIRE=d.WIRE||[];ENV_SENT=d.ENV_SENT||{};ANSWERS=d.ANSWERS||{};
+ RECEIVED=d.RECEIVED||{};if(d.OTHER_SUB)OTHER_SUB=d.OTHER_SUB;
  if(d.MAPPING)MAPPING=d.MAPPING;
  if(d.S)Object.assign(S,d.S);
  SAVED_AT=w.at?new Date(w.at):null;
@@ -837,6 +845,11 @@ function dataPanel(){
  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
   +'<button type="button" class="btn" onclick="pickProgramme()">Load a programme file</button>'
   +'<button type="button" class="tbtn" onclick="exportProgramme()">Download this one as a template</button></div>'
+ +'<div class="lbl">Partner returns</div>'
+ +'<div class="small" style="margin:3px 0 8px">What crosses between a partner and the lead: the figures the donor asks for, each local check in one of four words, and a digest binding the figure to the evidence it was checked against. Not the evidence.</div>'
+ +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+  +'<button type="button" class="btn ghost" onclick="exportReturn()">Export my return</button>'
+  +'<button type="button" class="btn ghost" onclick="pickReturn()">Import a partner return</button></div>'
  +'<div class="lbl">Hand the period on</div>'
  +'<div class="small" style="margin:3px 0 8px">Figures, the local verdict behind each one, what was approved, and the trail of who changed what. '
   +'Source documents are not included — they stay with the partner holding them.</div>'
@@ -934,48 +947,63 @@ function siloPersonal(p){return (SILO[p]?.docs||[]).filter(d=>d.pd).length;}
 /* Runs inside the partner. The donor's rules are applied where the evidence
    is, and only the verdict travels. A status is one of four words, so there is
    nothing for a model to embroider on the way out. */
-const LOCAL_CHECKS={
- 'OP3.1':[
-  {id:'disaggregation',ask:'Sex, age band and disability present'},
-  {id:'reconciliation',ask:'Female + male reconciles with the total'},
-  {id:'deduplication',ask:'Attendance deduplicated to certified people'}],
- 'CC1':[
-  {id:'ratio',ask:'Numerator and denominator both supplied'},
-  {id:'ratio_sane',ask:'Numerator does not exceed the denominator'}],
- 'OC2.2':[
-  {id:'ratio',ask:'Numerator and denominator both supplied'},
-  {id:'narrative',ask:'Barriers noted in usable prose'}],
- 'OP1.3':[
-  {id:'inclusion_floor',ask:'Female membership at or above the 40% floor'}],
-};
-function localCheck(p,ind,id,v){
+/* ------------------------- the local filter ------------------------------ */
+/* Runs inside the partner. The donor's rules are applied where the evidence
+   is, and only the verdict travels. A status is one of four words, so there is
+   nothing for a model to embroider on the way out.
+
+   The checks are read off the return template: a programme with different
+   indicators sends verdicts about its own form, not silence. A section may
+   also declare checks a machine cannot settle — those cross as the partner's
+   attestation, labelled as such. */
+function localChecksFor(s){
+ const out=[],F=s.fields||[];
+ if(F.some(f=>f.req))out.push({id:'required',ask:'Every field the donor form requires is filled'});
+ const num=F.find(f=>/numerator/i.test(f.l)),den=F.find(f=>/denominator/i.test(f.l));
+ if(num&&den){
+  out.push({id:'ratio',ask:'Numerator and denominator both supplied',num:num.l,den:den.l});
+  out.push({id:'ratio_sane',ask:'Numerator does not exceed the denominator',num:num.l,den:den.l});}
+ if(s.reconcile)out.push({id:'reconciliation',ask:s.reconcile.parts.join(' + ')+' reconciles with the total'});
+ if(s.floor)out.push({id:'floor',ask:s.floor.field+' at or above '+s.floor.min+'%'});
+ if(s.expect)out.push({id:'narrative',ask:'Barriers noted in usable prose'});
+ (s.localChecks||[]).forEach(c=>out.push(Object.assign({attested:true},c)));
+ return out;
+}
+const STATUSES=['MET','NOT_MET','UNKNOWN','NOT_APPLICABLE'];
+function localCheck(p,sec,c,v){
  const n=x=>parseInt((x||'').toString().replace(/[^0-9]/g,''))||0;
- if(id==='disaggregation')return ['Female','Male','Under-30','Health workers with disability'].every(k=>v[k])?'MET':'NOT_MET';
- if(id==='reconciliation'){const t=n(v['Total certified (in-period)']),f=n(v['Female']),m=n(v['Male']);
-  if(!t||!f||!m)return 'UNKNOWN';return Math.abs(t-(f+m))<=1?'MET':'NOT_MET';}
- if(id==='deduplication')return p==='Riverbend Community Care'?'MET':'NOT_APPLICABLE';
- if(id==='ratio'){const k=Object.keys(v),num=k.find(x=>/numerator/i.test(x)),den=k.find(x=>/denominator/i.test(x));
-  return num&&den&&v[num]&&v[den]?'MET':'NOT_MET';}
- if(id==='ratio_sane'){const k=Object.keys(v),num=k.find(x=>/numerator/i.test(x)),den=k.find(x=>/denominator/i.test(x));
-  if(!num||!den)return 'UNKNOWN';return n(v[num])<=n(v[den])?'MET':'NOT_MET';}
- if(id==='narrative'){const t=(v['Narrative / barriers noted']||'').trim();return !t?'NOT_MET':t.length<50?'NOT_MET':'MET';}
- if(id==='inclusion_floor'){const q=n(v['Female members (%)']);if(!q)return 'UNKNOWN';return q>=40?'MET':'NOT_MET';}
+ const txt=k=>(v[k]||'').toString().trim();
+ /* An attestation is a person's word, not a computation. It says who it does
+    not apply to, and otherwise carries what that partner declared. */
+ if(c.attested){
+  if(Array.isArray(c.appliesTo)&&c.appliesTo.indexOf(p)<0)return 'NOT_APPLICABLE';
+  return STATUSES.indexOf(c.status)>=0?c.status:'UNKNOWN';
+ }
+ if(c.id==='required')return (sec.fields||[]).filter(f=>f.req&&!txt(f.l)).length?'NOT_MET':'MET';
+ if(c.id==='ratio')return txt(c.num)&&txt(c.den)?'MET':'NOT_MET';
+ if(c.id==='ratio_sane'){
+  if(!txt(c.num)||!txt(c.den))return 'UNKNOWN';
+  return n(v[c.num])<=n(v[c.den])?'MET':'NOT_MET';}
+ if(c.id==='reconciliation'){
+  const r=sec.reconcile,t=n(v[r.total]),parts=r.parts.map(l=>n(v[l]));
+  if(!t||parts.some(x=>!x))return 'UNKNOWN';
+  return Math.abs(t-parts.reduce((a,b)=>a+b,0))<=(r.tol||1)?'MET':'NOT_MET';}
+ if(c.id==='floor'){const q=n(v[sec.floor.field]);return q?(q>=sec.floor.min?'MET':'NOT_MET'):'UNKNOWN';}
+ if(c.id==='narrative'){const t=txt(sec.expect.field);return t&&t.length>=(sec.expect.minLen||50)?'MET':'NOT_MET';}
  return 'UNKNOWN';
 }
-/* The digest binds a figure to the evidence it was checked against. The lead
-   can tell the figure has not moved since; it still cannot read what moved it. */
 function evidenceDigest(p,ind,v){return digestOf(p+'|'+ind+'|'+JSON.stringify(v)+'|'+siloKb(p));}
 
 function emitReturn(p,vals){
  const secs=[];
- Object.keys(LOCAL_CHECKS).forEach(ind=>{
-  const v=vals[ind];if(!v)return;
-  secs.push({ind,
+ (TPL.sections||[]).forEach(sec=>{
+  const v=vals[sec.ind];if(!v)return;
+  secs.push({ind:sec.ind,
    figures:v,
-   checks:LOCAL_CHECKS[ind].map(c=>({id:c.id,status:localCheck(p,ind,c.id,v)})),
-   evidence:{held_by:SILO[p]?.short||p,documents:(SILO[p]?.docs||[]).length,digest:evidenceDigest(p,ind,v)}});
+   checks:localChecksFor(sec).map(c=>({id:c.id,ask:c.ask,attested:!!c.attested,status:localCheck(p,sec,c,v)})),
+   evidence:{held_by:SILO[p]?.short||p,documents:(SILO[p]?.docs||[]).length,digest:evidenceDigest(p,sec.ind,v)}});
  });
- return {from:SILO[p]?.short||p,period:'Q1 2026',round:1,sections:secs};
+ return {from:SILO[p]?.short||p,period:PERIOD.label,round:1,sections:secs};
 }
 /* The financial side crosses as four numbers and a list of verdicts. Cost
    descriptions, counterparties, invoice numbers and staff names stay put. */
@@ -987,6 +1015,87 @@ function emitCosts(p,costs,flagsOf){
   else eligible+=c.a;});
  return {from:SILO[p]?.short||p,lines:costs.length,eligible_eur:eligible,at_risk_eur:atRisk,
          failed_checks:Object.keys(byCheck).length};
+}
+
+/* --------------------- the return, as a file that travels ---------------- */
+/* The boundary is only real when the two sides are two copies of this page in
+   two organisations. A partner exports what it would send; the lead imports it
+   and can say what arrived and what it weighed. No server stands between them,
+   which is the point: what crosses is a file the sender can read in full
+   before it goes. */
+const RETURN_SCHEMA='vizier4dev/return@1';
+/* Returns that arrived from other partners, kept apart from this partner's own
+   work so a received verdict is never mistaken for one made here. */
+let RECEIVED={};
+
+function returnPackage(p){
+ const pack=emitReturn(p,partnerValues(p));
+ const costs=p===ME?emitCosts(p,COSTS,costFlags):null;
+ return{schema:RETURN_SCHEMA,
+  programme:{id:PROG.id,title:PROG.title},
+  period:clone(PERIOD),
+  partner:p,short:(SILO[p]&&SILO[p].short)||p,
+  preparedAt:new Date().toISOString(),
+  round:pack.round,sections:pack.sections,costs:costs};
+}
+function exportReturn(){
+ if(!S.submitted&&S.persona==='partner'){toast('Submit the return first — what crosses is what you signed off.');return;}
+ saveJSON(fileStem()+'-'+String(PERIOD.label||'period').replace(/\s+/g,'-')+'-'+((SILO[ME]&&SILO[ME].short)||'return')+'.json',returnPackage(ME));
+}
+
+/* A received return is checked before it is believed: the right programme, the
+   right period, a partner this action has, indicators this framework defines,
+   and verdicts in the four words. Anything else is refused whole. */
+function validateReturn(r){
+ const e=[];
+ if(!r||typeof r!=='object'||Array.isArray(r))return['The file does not contain a JSON object.'];
+ if(r.schema!==RETURN_SCHEMA)e.push('schema: expected "'+RETURN_SCHEMA+'", found '+JSON.stringify(r.schema)+'.');
+ const prog=r.programme||{};
+ if(prog.id!==PROG.id)e.push('programme.id: this return was prepared for '+JSON.stringify(prog.id)+', and the loaded programme is '+JSON.stringify(PROG.id)+'.');
+ if(!r.period||r.period.label!==PERIOD.label)
+  e.push('period.label: this return covers '+JSON.stringify(r.period&&r.period.label)+', and the open period is '+JSON.stringify(PERIOD.label)+'.');
+ if(typeof r.partner!=='string'||PARTNERS.indexOf(r.partner)<0)
+  e.push('partner: '+JSON.stringify(r.partner)+' is not a partner in this action.');
+ else if(r.partner===ME)e.push('partner: this is your own return. Import the ones that came from the other partners.');
+ const codes=INDICATORS.map(i=>i.code);
+ if(!Array.isArray(r.sections)||!r.sections.length)e.push('sections: required, a return with no sections says nothing.');
+ else r.sections.forEach((sec,ix)=>{
+  if(codes.indexOf(sec&&sec.ind)<0){e.push('sections['+ix+'].ind: '+JSON.stringify(sec&&sec.ind)+' is not an indicator in this framework.');return;}
+  if(!sec.figures||typeof sec.figures!=='object')e.push('sections['+ix+'].figures: required.');
+  (sec.checks||[]).forEach((c,ci)=>{
+   if(STATUSES.indexOf(c&&c.status)<0)e.push('sections['+ix+'].checks['+ci+'].status: '+JSON.stringify(c&&c.status)+' is not one of '+STATUSES.join(', ')+'.');});
+  const d=sec.evidence&&sec.evidence.digest;
+  if(typeof d!=='string'||!/^[0-9a-f]{16}$/.test(d))
+   e.push('sections['+ix+'].evidence.digest: a 16-character hex digest is required — without it the figure is not bound to anything.');
+ });
+ return e;
+}
+
+function pickReturn(){const i=document.getElementById('returnfile');if(i){i.value='';i.click();}}
+function readReturn(input){
+ const f=input&&input.files&&input.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onerror=function(){dataProblem(['The file could not be read.']);};
+ r.onload=function(){
+  let pack;try{pack=JSON.parse(r.result);}catch(err){return dataProblem(['That file is not valid JSON: '+err.message]);}
+  const errs=validateReturn(pack);
+  if(errs.length)return dataProblem(errs);
+  acceptReturn(pack,byteLen(r.result));
+ };
+ r.readAsText(f);
+}
+function acceptReturn(pack,bytes){
+ const p=pack.partner;
+ const figures={};
+ pack.sections.forEach(sec=>{figures[sec.ind]=sec.figures;});
+ OTHER_SUB[p]=figures;
+ RECEIVED[p]={at:pack.preparedAt,round:pack.round||1,sections:pack.sections,costs:pack.costs||null,bytes:bytes};
+ WIRE.push({round:pack.round||1,from:pack.short||p,to:'LEAD',kind:'return',bytes:bytes,body:JSON.stringify(pack)});
+ ENV_SENT[p]=true;
+ const notMet=pack.sections.reduce((a,sec)=>a+(sec.checks||[]).filter(c=>c.status==='NOT_MET').length,0);
+ logEvent('Return received',p+' — '+pack.sections.length+' indicator(s), '+bytes+' bytes, '+notMet+' local check(s) not met');
+ saveWork();render();
+ toast('Received '+p+' — '+bytes+' bytes crossed, '+(notMet?notMet+' check(s) not met':'every local check met')+'.');
 }
 
 /* ------------------------------ the wire -------------------------------- */
@@ -1010,6 +1119,9 @@ function ensureEnvelopes(){
  PARTNERS.forEach(p=>{
   if(ENV_SENT[p]||!SILO[p])return;
   if(p===ME&&!S.submitted)return;
+  /* Another partner's envelope is theirs to cut. This copy only has one when
+     their return has been imported, or when the demo staged it. */
+  if(p!==ME&&!Object.keys(partnerValues(p)||{}).length)return;
   const short=SILO[p].short;
   send(short,'LEAD','return',emitReturn(p,partnerValues(p)),1);
   if(p===ME){const ce=emitCosts(p,COSTS,costFlags);if(ce)send(short,'LEAD','costs',ce,1);}
@@ -1764,7 +1876,7 @@ function boundaryPanel(p){
   <p class="small">${s.docs.length} documents, ${fmt(siloKb(p))} KB, ${siloPersonal(p)} of them carrying personal data. None of it crossed. The checks below ran where the evidence is; only their verdict and a digest were sent.</p>
   <table><tbody>${env.sections.map(sec=>{const a=ANSWERS[p+'::'+sec.ind];
    return `<tr><td style="width:18%"><span class="mono">${esc(sec.ind)}</span></td>
-    <td>${sec.checks.map(c=>`<span class="tag ${c.status==='MET'?'good':c.status==='NOT_MET'?'bad':''}">${esc(c.id)} ${esc(c.status)}</span>`).join(' ')}
+    <td>${sec.checks.map(c=>`<span class="tag ${c.status==='MET'?'good':c.status==='NOT_MET'?'bad':''}">${esc(c.id)} ${esc(c.status)}${c.attested?' · attested':''}</span>`).join(' ')}
      ${a?`<div class="small" style="margin-top:5px">Answered in round 2: ${esc(a.evidence_kind)}, ${a.documents} documents held${a.deduplicated?', deduplicated':''}.</div>`:''}</td>
     <td class="mono small" style="width:1%;white-space:nowrap">${esc(sec.evidence.digest)}</td>
     <td style="width:1%">${a?'<span class="tag good">asked</span>':`<button class="btn ghost sm" onclick="askEvidence('${attr(p)}','${attr(sec.ind)}')">Ask what it rests on</button>`}</td></tr>`;}).join('')}
@@ -1804,10 +1916,30 @@ function openWire(w){
 }
 
 /* ------------------------------ the view -------------------------------- */
+/* The two sides of the boundary are two copies of this page in two
+   organisations. This is where a return leaves one and arrives at the other,
+   so it stays reachable before anything has crossed. */
+function exchangePanel(){
+ const rec=Object.keys(RECEIVED);
+ return panel(`<h2>The exchange</h2>
+  <div class="small" style="margin-bottom:11px">A partner exports what it would send and can read the whole file before it goes. The lead imports it and can say what arrived and what it weighed. Nothing passes through a server, and the evidence behind the figures never leaves the partner holding it.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="btn" onclick="exportReturn()">Export my return</button>
+    ${can()?'<button type="button" class="btn ghost" onclick="pickReturn()">Import a partner return</button>':''}
+  </div>
+  ${rec.length?`<div class="lbl" style="margin-top:14px">Received</div>
+   <table><tbody>${rec.map(p=>`<tr><td>${esc(p)}</td>
+     <td class="mono small" style="width:1%;white-space:nowrap">${fmt(RECEIVED[p].bytes)} B</td>
+     <td class="mono small" style="width:1%;white-space:nowrap">round ${RECEIVED[p].round}</td>
+     <td style="width:1%">${(()=>{const n=RECEIVED[p].sections.reduce((a,x)=>a+(x.checks||[]).filter(c=>c.status==='NOT_MET').length,0);
+       return n?`<span class="tag bad">${n} not met</span>`:'<span class="tag good">all met</span>';})()}</td></tr>`).join('')}
+   </tbody></table>`:''}`);
+}
 VIEW.boundary=function(){
  ensureEnvelopes();
- if(!boundaryReady())return head('Partner boundary')
-  +locked('Nothing has crossed yet. Partners file first, then what crossed can be counted.','collect','review','Go to review');
+ if(!boundaryReady())return head('Partner boundary','Each partner checks its own evidence and sends the verdict. Nothing has crossed yet.')
+  +exchangePanel()
+  +locked('Once a return is submitted or imported, what crossed can be counted here.','collect','review','Go to review');
  const crossed=wireBytes(),held=heldKb();
  return head('Partner boundary','Each partner checks its own evidence and sends the verdict. The documents behind the figures never leave the organisation that holds them.')
   +panel(`<div class="grid g3">
@@ -1815,19 +1947,27 @@ VIEW.boundary=function(){
     ${stat('Stayed at the partners',fmt(held)+' KB',Object.keys(SILO).length+' silos')}
     ${stat('Documents with personal data',heldPersonal(),'none transferred')}</div>
    <p class="small" style="margin-top:11px">A consortium that mails spreadsheets has already transferred everything, and the only question left is who reads it. Here the ratio is the point: ${fmt(crossed)} bytes of typed verdicts against ${fmt(held)} KB of evidence that did not move.</p>`)
-  +PARTNERS.map(p=>{const s=SILO[p];if(!s)return '';
-    const env=emitReturn(p,partnerValues(p));
+  +exchangePanel()
+  +PARTNERS.map(p=>{
+    /* For a partner whose return arrived as a file, the verdicts shown are the
+       ones that partner made and sent. Recomputing them here would defeat the
+       arrangement: the lead never had the evidence to decide them. */
+    const rec=RECEIVED[p],s=SILO[p];
+    if(!s&&!rec)return '';
+    const env=rec?{sections:rec.sections}:emitReturn(p,partnerValues(p));
     return panel(`<div style="display:flex;gap:9px;align-items:center;margin-bottom:9px">
-      <span class="tag acc mono">${esc(s.short)}</span><b>${esc(p)}</b></div>
+      <span class="tag acc mono">${esc((s&&s.short)||(rec&&rec.sections.length&&p.split(' ').map(w=>w[0]).join(''))||'—')}</span><b>${esc(p)}</b>
+      ${rec?`<span style="flex:1"></span><span class="tag">received · ${fmt(rec.bytes)} B</span>`:''}</div>
      <div class="lbl">Held locally, not sent</div>
-     <table><tbody>${s.docs.map(d=>`<tr><td>${esc(d.n)}</td>
+     ${s?'':'<p class="small">This partner did not describe what it holds, and does not have to. What it sent is below.</p>'}
+     <table><tbody>${((s&&s.docs)||[]).map(d=>`<tr><td>${esc(d.n)}</td>
        <td class="mono" style="width:1%;white-space:nowrap">${fmt(d.kb)} KB</td>
        <td style="width:1%">${d.pd?'<span class="tag warn">personal data</span>':'<span class="tag">held</span>'}</td></tr>`).join('')}
       </tbody></table>
      <div class="lbl" style="margin-top:13px">Sent instead</div>
      ${env.sections.length?'':'<p class="small">Nothing yet — this return has not been submitted, so nothing has crossed. The documents above are already here.</p>'}
      <table><tbody>${env.sections.map(sec=>`<tr><td style="width:22%"><span class="mono">${esc(sec.ind)}</span></td>
-       <td>${sec.checks.map(c=>`<span class="tag ${c.status==='MET'?'good':c.status==='NOT_MET'?'bad':''}">${esc(c.id)} ${esc(c.status)}</span>`).join(' ')}</td>
+       <td>${sec.checks.map(c=>`<span class="tag ${c.status==='MET'?'good':c.status==='NOT_MET'?'bad':''}">${esc(c.id)} ${esc(c.status)}${c.attested?' · attested':''}</span>`).join(' ')}</td>
        <td class="mono small" style="width:1%;white-space:nowrap">${esc(sec.evidence.digest)}</td></tr>`).join('')}
       </tbody></table>`);}).join('')
   +panel(`<h2>What crossed</h2>
@@ -2443,7 +2583,7 @@ function endTour(){document.getElementById('coach').classList.add('hidden');ti=-
 function resetPeriod(){
  TPL=defaultTemplate();NARRATIVE=defaultNarr();SUB={};VERIFY={};COMMENTS={};APPROVED={};
  LQS=[...LEARNING_Q];PLQ=[...PLQ_SEED];PIPELINE=[];
- COSTS=defaultCosts();LEDGER=[];WIRE=[];ENV_SENT={};ANSWERS={};MAPPING=clone(MAPPING_SEED);
+ COSTS=defaultCosts();LEDGER=[];WIRE=[];ENV_SENT={};ANSWERS={};RECEIVED={};MAPPING=clone(MAPPING_SEED);
  Object.assign(S,{persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
   consolidated:false,reviewTarget:'',propReviewed:false,curFit:(PROP_REVIEW&&PROP_REVIEW.fit)||0});
  ['lead','partner','mel'].forEach(x=>{const b=document.getElementById('p-'+x);

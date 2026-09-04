@@ -1,0 +1,46 @@
+{
+  "schema": "vizier4dev/return@1",
+  "programme": {
+    "id": "wp-phase-2",
+    "title": "Rural Water Points — Phase II"
+  },
+  "period": {
+    "from": "2026-04-01",
+    "to": "2026-06-30",
+    "label": "Q2 2026"
+  },
+  "partner": "Oblast Vodokanal",
+  "short": "OV",
+  "preparedAt": "2026-07-08T09:20:00.000Z",
+  "round": 1,
+  "sections": [
+    {
+      "ind": "W1",
+      "figures": {
+        "Points commissioned": "41",
+        "Means of verification": "Oblast commissioning register, Q2 2026"
+      },
+      "checks": [
+        { "id": "required", "ask": "Every field the donor form requires is filled", "attested": false, "status": "MET" }
+      ],
+      "evidence": { "held_by": "OV", "documents": 3, "digest": "75f818a0d47315ed" }
+    },
+    {
+      "ind": "W2",
+      "figures": {
+        "Households with access (numerator)": "2180",
+        "Households surveyed (denominator)": "4900",
+        "Means of verification": "Rayon household survey, June 2026",
+        "Narrative / barriers noted": "Two rayons still lose supply each spring when the pump housing floods; the operator committee has no tariff income to fund the repair, so the outage runs into the growing season."
+      },
+      "checks": [
+        { "id": "required", "ask": "Every field the donor form requires is filled", "attested": false, "status": "MET" },
+        { "id": "ratio", "ask": "Numerator and denominator both supplied", "attested": false, "status": "MET" },
+        { "id": "ratio_sane", "ask": "Numerator does not exceed the denominator", "attested": false, "status": "MET" },
+        { "id": "narrative", "ask": "Barriers noted in usable prose", "attested": false, "status": "MET" }
+      ],
+      "evidence": { "held_by": "OV", "documents": 4, "digest": "bf74d142ffca2e61" }
+    }
+  ],
+  "costs": null
+}
