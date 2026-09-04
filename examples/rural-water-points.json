@@ -7,9 +7,17 @@
     "en": "€1.2M · IFI-funded · 3-partner consortium · Q2 reporting period",
     "ru": "€1,2 млн · финансирование МФО · консорциум из 3 партнёров · отчётный период Q2"
   },
-  "period": { "from": "2026-04-01", "to": "2026-06-30", "label": "Q2 2026" },
+  "period": {
+    "from": "2026-04-01",
+    "to": "2026-06-30",
+    "label": "Q2 2026"
+  },
   "me": "Aral Water NGO",
-  "partners": ["Aral Water NGO", "Oblast Vodokanal", "Steppe Engineering LLP"],
+  "partners": [
+    "Aral Water NGO",
+    "Oblast Vodokanal",
+    "Steppe Engineering LLP"
+  ],
   "procurementThreshold": 8000,
   "sources": {
     "ga": {
@@ -20,66 +28,259 @@
     }
   },
   "indicators": [
-    { "code": "W1", "label": "Water points rehabilitated", "unit": "points", "base": "0", "target": "120",
-      "lead": "SE", "need": "Count + commissioning sign-off", "anchor": "W1 - Water points rehabilitated",
-      "agg": { "type": "sum", "field": "Points commissioned" } },
-    { "code": "W2", "label": "Households with year-round access", "unit": "%", "base": "21", "target": "≥60",
-      "lead": "AW", "need": "Numerator + denominator", "anchor": "W2 - Households with year-round access",
-      "agg": { "type": "ratio", "num": "Households with access (numerator)", "den": "Households surveyed (denominator)", "unit": "%" } },
-    { "code": "W3", "label": "Operator committees functioning", "unit": "committees", "base": "0", "target": "40",
-      "lead": "AW", "need": "Count", "anchor": "W3 - Operator committees functioning",
-      "agg": { "type": "none", "note": "counted centrally by the oblast, not by partner" } }
+    {
+      "code": "W1",
+      "label": "Water points rehabilitated",
+      "unit": "points",
+      "base": "0",
+      "target": "120",
+      "lead": "SE",
+      "need": "Count + commissioning sign-off",
+      "anchor": "W1 - Water points rehabilitated",
+      "agg": {
+        "type": "sum",
+        "field": "Points commissioned"
+      }
+    },
+    {
+      "code": "W2",
+      "label": "Households with year-round access",
+      "unit": "%",
+      "base": "21",
+      "target": "≥60",
+      "lead": "AW",
+      "need": "Numerator + denominator",
+      "anchor": "W2 - Households with year-round access",
+      "agg": {
+        "type": "ratio",
+        "num": "Households with access (numerator)",
+        "den": "Households surveyed (denominator)",
+        "unit": "%"
+      }
+    },
+    {
+      "code": "W3",
+      "label": "Operator committees functioning",
+      "unit": "committees",
+      "base": "0",
+      "target": "40",
+      "lead": "AW",
+      "need": "Count",
+      "anchor": "W3 - Operator committees functioning",
+      "agg": {
+        "type": "none",
+        "note": "counted centrally by the oblast, not by partner"
+      }
+    }
   ],
   "rules": [
-    { "t": "Quarterly partner returns", "d": "Within 10 working days of quarter end", "anchor": "Partner -> Lead: quarterly" },
-    { "t": "No bare percentages", "d": "Numerator and denominator required", "anchor": "Report numerator AND denominator" },
-    { "t": "Comparison of offers above the threshold", "d": "Procurement over €8,000", "anchor": "Procurement above EUR 8,000" }
+    {
+      "t": "Quarterly partner returns",
+      "d": "Within 10 working days of quarter end",
+      "anchor": "Partner -> Lead: quarterly"
+    },
+    {
+      "t": "No bare percentages",
+      "d": "Numerator and denominator required",
+      "anchor": "Report numerator AND denominator"
+    },
+    {
+      "t": "Comparison of offers above the threshold",
+      "d": "Procurement over €8,000",
+      "anchor": "Procurement above EUR 8,000"
+    }
   ],
   "budget": [
-    { "h": "Civil works", "b": 700000, "q1p": 180000, "q1a": 214000 },
-    { "h": "Equipment", "b": 300000, "q1p": 60000, "q1a": 52000 },
-    { "h": "Human resources", "b": 200000, "q1p": 40000, "q1a": 39000 }
+    {
+      "h": "Civil works",
+      "b": 700000,
+      "q1p": 180000,
+      "q1a": 214000
+    },
+    {
+      "h": "Equipment",
+      "b": 300000,
+      "q1p": 60000,
+      "q1a": 52000
+    },
+    {
+      "h": "Human resources",
+      "b": 200000,
+      "q1p": 40000,
+      "q1a": 39000
+    }
   ],
   "coreIndicators": [
-    { "c": "EB-01", "l": "Water infrastructure rehabilitated" },
-    { "c": "EB-02", "l": "Population with improved access" }
+    {
+      "c": "EB-01",
+      "l": "Water infrastructure rehabilitated"
+    },
+    {
+      "c": "EB-02",
+      "l": "Population with improved access"
+    }
   ],
-  "mapping": { "W1": "EB-01" },
+  "mapping": {
+    "W1": "EB-01"
+  },
   "silo": {
-    "Aral Water NGO": { "short": "AW", "docs": [
-      { "n": "Household survey — Q2", "kb": 640, "pd": true },
-      { "n": "Invoices and contracts — Q2 claim", "kb": 2100, "pd": false } ] }
+    "Aral Water NGO": {
+      "short": "AW",
+      "docs": [
+        {
+          "n": "Household survey — Q2",
+          "kb": 640,
+          "pd": true
+        },
+        {
+          "n": "Invoices and contracts — Q2 claim",
+          "kb": 2100,
+          "pd": false
+        }
+      ]
+    }
   },
   "costs": [
-    { "id": "K-1", "h": "Civil works", "d": "Borehole rehabilitation, 14 sites", "a": 96000, "t": "procure",
-      "date": "2026-05-12", "link": "W1", "have": ["invoice", "contract", "quotes"] },
-    { "id": "K-2", "h": "Human resources", "d": "Field engineer — 0.5 FTE, April to June", "a": 9200, "t": "staff",
-      "date": "2026-06-30", "link": "", "have": ["invoice"] },
-    { "id": "K-3", "h": "Equipment", "d": "Hand pumps and fittings — bulk order", "a": 21400, "t": "procure",
-      "date": "2026-06-18", "link": "W1", "have": ["invoice"] }
+    {
+      "id": "K-1",
+      "h": "Civil works",
+      "d": "Borehole rehabilitation, 14 sites",
+      "a": 96000,
+      "t": "procure",
+      "date": "2026-05-12",
+      "link": "W1",
+      "have": [
+        "invoice",
+        "contract",
+        "quotes"
+      ]
+    },
+    {
+      "id": "K-2",
+      "h": "Human resources",
+      "d": "Field engineer — 0.5 FTE, April to June",
+      "a": 9200,
+      "t": "staff",
+      "date": "2026-06-30",
+      "link": "",
+      "have": [
+        "invoice"
+      ]
+    },
+    {
+      "id": "K-3",
+      "h": "Equipment",
+      "d": "Hand pumps and fittings — bulk order",
+      "a": 21400,
+      "t": "procure",
+      "date": "2026-06-18",
+      "link": "W1",
+      "have": [
+        "invoice"
+      ]
+    },
+    {
+      "id": "K-4",
+      "h": "Civil works",
+      "d": "Pipe fittings and haulage, Naryn rayon — paid in local currency",
+      "a": 14300,
+      "t": "procure",
+      "date": "2026-06-04",
+      "link": "W1",
+      "have": [
+        "invoice",
+        "contract",
+        "quotes"
+      ],
+      "local": {
+        "cur": "KGS",
+        "amt": 1360000,
+        "rate": 0.0105
+      }
+    },
+    {
+      "id": "K-5",
+      "h": "Equipment",
+      "d": "Advance to the supply contractor for the July pump consignment",
+      "a": 18000,
+      "t": "advance",
+      "cleared": false,
+      "date": "2026-06-26",
+      "link": "W1",
+      "have": [
+        "invoice",
+        "contract"
+      ]
+    }
   ],
   "template": {
     "name": "Quarterly partner return — Q2",
     "status": "draft",
     "sections": [
-      { "ind": "W1", "title": "Water points rehabilitated",
+      {
+        "ind": "W1",
+        "title": "Water points rehabilitated",
         "why": "Count with commissioning sign-off named as the means of verification.",
         "anchor": "W1 - Water points rehabilitated",
         "fields": [
-          { "l": "Points commissioned", "t": "number", "req": true },
-          { "l": "Means of verification", "t": "text", "req": true },
-          { "l": "Evidence", "t": "file", "req": false } ] },
-      { "ind": "W2", "title": "Households with year-round access",
+          {
+            "l": "Points commissioned",
+            "t": "number",
+            "req": true
+          },
+          {
+            "l": "Means of verification",
+            "t": "text",
+            "req": true
+          },
+          {
+            "l": "Evidence",
+            "t": "file",
+            "req": false
+          }
+        ]
+      },
+      {
+        "ind": "W2",
+        "title": "Households with year-round access",
         "why": "Donor rule: percentages need a numerator and a denominator.",
         "anchor": "Report numerator AND denominator",
-        "expect": { "field": "Narrative / barriers noted", "minLen": 50,
-          "words": ["seasonal", "pump", "distance", "committee", "tariff", "breakdown"],
-          "topic": "what actually limits access — seasonality, breakdowns, distance, tariffs" },
+        "expect": {
+          "field": "Narrative / barriers noted",
+          "minLen": 50,
+          "words": [
+            "seasonal",
+            "pump",
+            "distance",
+            "committee",
+            "tariff",
+            "breakdown"
+          ],
+          "topic": "what actually limits access — seasonality, breakdowns, distance, tariffs"
+        },
         "fields": [
-          { "l": "Households with access (numerator)", "t": "number", "req": true },
-          { "l": "Households surveyed (denominator)", "t": "number", "req": true },
-          { "l": "Means of verification", "t": "text", "req": true },
-          { "l": "Narrative / barriers noted", "t": "longtext", "req": false } ] }
+          {
+            "l": "Households with access (numerator)",
+            "t": "number",
+            "req": true
+          },
+          {
+            "l": "Households surveyed (denominator)",
+            "t": "number",
+            "req": true
+          },
+          {
+            "l": "Means of verification",
+            "t": "text",
+            "req": true
+          },
+          {
+            "l": "Narrative / barriers noted",
+            "t": "longtext",
+            "req": false
+          }
+        ]
+      }
     ]
   },
   "narrative": {
@@ -87,16 +288,54 @@
     "status": "draft",
     "_t": null,
     "sections": [
-      { "id": "exec", "t": "1. Executive summary", "g": "Key results, deviations and decisions this quarter.",
-        "v": "", "flags": [], "comments": [], "attach": [], "need": [] },
-      { "id": "ctx", "t": "2. Context update", "g": "Changes in the operating environment: access, seasonality, prices.",
-        "v": "", "flags": [], "comments": [], "attach": [], "need": [] },
-      { "id": "res", "t": "3. Results against the framework", "g": "What was delivered against each output, with evidence.",
-        "v": "", "flags": [], "comments": [], "attach": [], "need": [] }
+      {
+        "id": "exec",
+        "t": "1. Executive summary",
+        "g": "Key results, deviations and decisions this quarter.",
+        "v": "",
+        "flags": [],
+        "comments": [],
+        "attach": [],
+        "need": []
+      },
+      {
+        "id": "ctx",
+        "t": "2. Context update",
+        "g": "Changes in the operating environment: access, seasonality, prices.",
+        "v": "",
+        "flags": [],
+        "comments": [],
+        "attach": [],
+        "need": []
+      },
+      {
+        "id": "res",
+        "t": "3. Results against the framework",
+        "g": "What was delivered against each output, with evidence.",
+        "v": "",
+        "flags": [],
+        "comments": [],
+        "attach": [],
+        "need": []
+      }
     ]
   },
   "learningQuestions": [
     "Which operator committees keep water points running after handover?",
     "Where does seasonal access still fail, and why?"
-  ]
+  ],
+  "eligibility": {
+    "reportingCurrency": "EUR",
+    "fxSource": "the central bank reference rate for the month of payment",
+    "fxRates": {
+      "KGS": 0.0102
+    },
+    "fxTolerance": 0.02,
+    "indirectRate": 0.05,
+    "ineligiblePayrollComponents": [
+      "provision",
+      "indirect overhead"
+    ],
+    "errorTaxonomy": null
+  }
 }

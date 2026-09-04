@@ -371,6 +371,34 @@ let BUDGET=[
 /* Cost lines for the partner's Q1 financial return. `have` = evidence already on file.
    Thresholds below are the programme's own procurement rule, carried from the grant agreement. */
 let PROC_THRESHOLD=10000;
+/* What makes a cost ineligible, beyond a missing document. These four come
+   from what auditors publish about their own findings: a rate applied to a
+   local-currency payment, payroll components that are never eligible, a
+   sub-implementer's overhead declared a second time as a direct cost, and an
+   advance declared before it was cleared. Each is programme data, because the
+   grant agreement sets them and they differ per donor and per action. */
+let ELIG={
+ reportingCurrency:'EUR',
+ fxSource:'the InforEuro rate for the month of payment',
+ /* TRC is the demo's own invented currency, so no real rate is ever implied. */
+ fxRates:{TRC:0.0740},
+ fxTolerance:0.02,
+ indirectRate:0.07,
+ ineligiblePayrollComponents:['provision','indirect overhead'],
+ /* The donor's own breakdown of what its auditors find, used by the financial
+    screen to show coverage rather than assert it. A programme with no published
+    breakdown carries none and that panel does not render. */
+ errorTaxonomy:{
+  source:'European Court of Auditors, Annual Report 2024, “Neighbourhood and the world”, figure 27',
+  note:'Share of the estimated level of error by type. The heading’s error rate was 4.9% against a 2% materiality threshold.',
+  rows:[
+   {key:'ineligible-cost',share:32,label:'Ineligible costs'},
+   {key:'procurement',share:26,label:'Serious failure to respect public procurement rules'},
+   {key:'missing-docs',share:25,label:'Absence of essential supporting documents'},
+   {key:'ineligible-project',share:8,label:'Ineligible project or beneficiary'},
+   {key:'not-incurred',share:8,label:'Expenditure not incurred'},
+   {key:'arithmetic',share:1,label:'Mathematical and administrative mistakes'}]}
+};
 let PERIOD={from:'2026-01-01',to:'2026-03-31',label:'Q1 2026'};
 function demoCosts(){return [
  {id:'C-101',h:'Human resources',d:'MEL officer — 0.6 FTE, January to March',a:14200,t:'staff',date:'2026-03-31',link:'',have:['invoice','payroll']},
@@ -380,6 +408,12 @@ function demoCosts(){return [
  {id:'C-105',h:'Feedback mechanism & outreach',d:'Toll-free line and drop-in desk staffing',a:4900,t:'procure',date:'2026-02-27',link:'CC1',have:['invoice','contract']},
  {id:'C-106',h:'Human resources',d:'Quarter-end performance bonus, project staff',a:3100,t:'bonus',date:'2026-03-31',link:'',have:['invoice','payroll']},
  {id:'C-107',h:'Last-mile transport & fuel',d:'Fuel for the northern route, March',a:6300,t:'procure',date:'2026-04-06',link:'OP2.1',have:['invoice']},
+ {id:'C-108',h:'Cold chain equipment',d:'Advance to SLC for the March refrigerator consignment',a:12800,t:'advance',cleared:false,date:'2026-03-20',link:'OP1.1',have:['invoice','contract']},
+ {id:'C-109',h:'Training & certification',d:'Venue hire and per diems, district workshops — paid in local currency',a:9400,t:'procure',date:'2026-03-11',link:'OP3.1',have:['invoice','contract'],local:{cur:'TRC',amt:117500,rate:0.0800}},
+ {id:'C-110',h:'Human resources',d:'Cold chain coordinator — salary and end-of-service provision',a:11700,t:'staff',date:'2026-03-31',link:'OP1.3',have:['invoice','payroll','timesheet'],components:['salary','provision']},
+ {id:'C-111',h:'MEL, audits and assessments',d:'Survey subcontractor — administrative overhead recharged',a:5200,t:'procure',date:'2026-03-25',link:'OC2.2',have:['invoice','contract'],indirect:true,sub:true},
+ {id:'C-112',h:'Cold chain equipment',d:'Solar direct-drive units ×24 — second district batch',a:31200,t:'procure',date:'2026-02-06',link:'OP1.1',have:['invoice','contract','quotes']},
+ {id:'C-113',h:'Training & certification',d:'Certification materials and printing',a:3400,t:'procure',date:'2026-03-19',link:'OP3.1',have:['invoice']},
 ];}
 let COSTS=defaultCosts();
 const DOCNAMES={invoice:'Invoice & proof of payment',timesheet:'Signed timesheet',payroll:'Payroll record',contract:'Signed contract',quotes:'Comparison of offers'};
@@ -575,7 +609,7 @@ function programmeSnapshot(){
  return{schema:PROG_SCHEMA,id:PROG.id,mode:PROG.mode,title:PROG.title,line:clone(PROG.line),
   period:clone(PERIOD),me:ME,partners:clone(PARTNERS),procurementThreshold:PROC_THRESHOLD,
   sources:clone(SRC),indicators:clone(INDICATORS),rules:clone(RULES),budget:clone(BUDGET),
-  coreIndicators:clone(CORE_IND),mapping:clone(MAPPING_SEED),silo:clone(SILO),
+  coreIndicators:clone(CORE_IND),mapping:clone(MAPPING_SEED),silo:clone(SILO),eligibility:clone(ELIG),
   costs:defaultCosts(),template:defaultTemplate(),narrative:defaultNarr(),
   learningQuestions:clone(LEARNING_Q),
   staging:live()?null:{draft:clone(DRAFT),draftNote:DRAFT_NOTE,conflict:clone(CONFLICT),
@@ -591,6 +625,10 @@ function applyProgramme(p){
  PERIOD=clone(p.period);ME=p.me;PARTNERS=clone(p.partners);PROC_THRESHOLD=p.procurementThreshold;
  SRC=clone(p.sources);INDICATORS=clone(p.indicators);RULES=clone(p.rules);BUDGET=clone(p.budget);
  CORE_IND=clone(p.coreIndicators||[]);SILO=clone(p.silo||{});LEARNING_Q=clone(p.learningQuestions||[]);
+ /* No inherited rules: a programme that declares no eligibility block gets the
+    document and threshold checks and nothing that depends on its own figures. */
+ ELIG=Object.assign({reportingCurrency:'EUR',fxRates:{},fxTolerance:0.02,
+  ineligiblePayrollComponents:[],errorTaxonomy:null},clone(p.eligibility||{}));
  SEED={costs:clone(p.costs||[]),template:clone(p.template),narrative:clone(p.narrative)};
  /* Every indicator gets a mapping slot whether the file names one or not, so the
     handover gate counts unmapped indicators rather than silently skipping them. */
@@ -649,6 +687,43 @@ function validateProgramme(p){
   if(codes.length&&codes.indexOf(s.ind)<0)e.push('template.sections['+ix+'].ind: "'+s.ind+'" is not an indicator in this file.');
   if(!Array.isArray(s.fields)||!s.fields.length)e.push('template.sections['+ix+'].fields: at least one field required.');});
  if(!p.narrative||!Array.isArray(p.narrative.sections))e.push('narrative.sections: required, may be an empty array.');
+ const el=p.eligibility;
+ if(el!==undefined){
+  if(!el||typeof el!=='object'||Array.isArray(el))e.push('eligibility: must be an object when present.');
+  else{
+   if(el.fxRates!==undefined&&(typeof el.fxRates!=='object'||Array.isArray(el.fxRates)))
+    e.push('eligibility.fxRates: must be an object of currency code to rate.');
+   else Object.keys(el.fxRates||{}).forEach(k=>{
+    if(typeof el.fxRates[k]!=='number'||!(el.fxRates[k]>0))e.push('eligibility.fxRates.'+k+': must be a rate above 0.');});
+   if(el.fxTolerance!==undefined&&(typeof el.fxTolerance!=='number'||el.fxTolerance<0||el.fxTolerance>1))
+    e.push('eligibility.fxTolerance: must be a fraction between 0 and 1.');
+   if(el.indirectRate!==undefined&&(typeof el.indirectRate!=='number'||el.indirectRate<0||el.indirectRate>1))
+    e.push('eligibility.indirectRate: must be a fraction between 0 and 1.');
+   if(el.ineligiblePayrollComponents!==undefined&&!Array.isArray(el.ineligiblePayrollComponents))
+    e.push('eligibility.ineligiblePayrollComponents: must be an array of component names.');
+   const tx=el.errorTaxonomy;
+   if(tx!==undefined&&tx!==null){
+    if(typeof tx!=='object'||!Array.isArray(tx.rows))e.push('eligibility.errorTaxonomy.rows: required when a taxonomy is given.');
+    else{
+     if(typeof tx.source!=='string'||!tx.source.trim())
+      e.push('eligibility.errorTaxonomy.source: required — a published breakdown has to say whose it is.');
+     tx.rows.forEach((r,ix)=>{
+      if(!r||typeof r.key!=='string'||!r.key.trim())e.push('eligibility.errorTaxonomy.rows['+ix+'].key: required.');
+      if(!r||typeof r.label!=='string'||!r.label.trim())e.push('eligibility.errorTaxonomy.rows['+ix+'].label: required.');
+      if(!r||typeof r.share!=='number'||r.share<0||r.share>100)e.push('eligibility.errorTaxonomy.rows['+ix+'].share: must be a percentage.');});}
+   }
+  }
+ }
+ (p.costs||[]).forEach((c,ix)=>{
+  if(c&&c.local){
+   if(typeof c.local.cur!=='string'||!c.local.cur.trim())e.push('costs['+ix+'].local.cur: currency code required.');
+   ['amt','rate'].forEach(k=>{if(typeof c.local[k]!=='number')e.push('costs['+ix+'].local.'+k+': must be a number.');});
+   const rates=(p.eligibility||{}).fxRates||{};
+   if(c.local.cur&&rates[c.local.cur]===undefined)
+    e.push('costs['+ix+'].local.cur: "'+c.local.cur+'" has no rate in eligibility.fxRates, so the conversion cannot be checked.');
+  }
+  if(c&&c.components!==undefined&&!Array.isArray(c.components))e.push('costs['+ix+'].components: must be an array.');
+ });
  const core=(p.coreIndicators||[]).map(c=>c&&c.c);
  Object.keys(p.mapping||{}).forEach(k=>{
   if(codes.length&&codes.indexOf(k)<0)e.push('mapping: "'+k+'" is not an indicator in this file.');
@@ -1769,24 +1844,92 @@ VIEW.boundary=function(){
 /* Every rule below mirrors a documented audit finding: personnel costs without reliable
    time tracking, procurement without a documented comparison, costs that cannot be tied
    to an output, bonuses linked solely to the action, and costs outside the period. */
+/* Every flag names the finding category it belongs to, so the financial screen
+   can show what is covered against the donor's published breakdown instead of
+   claiming coverage in prose. */
 function costFlags(c){
  const f=[];
  const has=d=>c.have.includes(d);
- if(!has('invoice')) f.push({sev:'red',m:'No invoice or proof of payment on file.',fix:'invoice'});
+ if(!has('invoice')) f.push({sev:'red',basis:'missing-docs',m:'No invoice or proof of payment on file.',fix:'invoice'});
  if(c.t==='staff'){
-  if(!has('timesheet')) f.push({sev:'red',m:'Personnel cost with no signed timesheet — the most frequent reason personnel costs are declared ineligible.',fix:'timesheet'});
-  else if(c.mismatch) f.push({sev:'amber',m:'Timesheet hours do not reconcile with the payroll record for the same month.'});
-  if(!has('payroll')) f.push({sev:'red',m:'No payroll record to support the declared salary cost.',fix:'payroll'});
+  if(!has('timesheet')) f.push({sev:'red',basis:'missing-docs',m:'Personnel cost with no signed timesheet — the most frequent reason personnel costs are declared ineligible.',fix:'timesheet'});
+  else if(c.mismatch) f.push({sev:'amber',basis:'missing-docs',m:'Timesheet hours do not reconcile with the payroll record for the same month.'});
+  if(!has('payroll')) f.push({sev:'red',basis:'missing-docs',m:'No payroll record to support the declared salary cost.',fix:'payroll'});
  }
- if(c.t==='bonus') f.push({sev:'red',m:'A bonus linked solely to the funded action is not an eligible cost. Move it off the grant.',hard:true});
+ if(c.t==='bonus') f.push({sev:'red',basis:'ineligible-cost',m:'A bonus linked solely to the funded action is not an eligible cost. Move it off the grant.',hard:true});
  if(c.t==='procure'){
-  if(!has('contract')&&c.a>=PROC_THRESHOLD) f.push({sev:'red',m:'Above the €'+fmt(PROC_THRESHOLD)+' threshold with no signed contract.',fix:'contract'});
-  if(!has('quotes')&&c.a>=PROC_THRESHOLD) f.push({sev:'red',m:'Above the €'+fmt(PROC_THRESHOLD)+' threshold with no documented comparison of offers.',fix:'quotes'});
+  if(!has('contract')&&c.a>=PROC_THRESHOLD) f.push({sev:'red',basis:'procurement',m:'Above the €'+fmt(PROC_THRESHOLD)+' threshold with no signed contract.',fix:'contract'});
+  if(!has('quotes')&&c.a>=PROC_THRESHOLD) f.push({sev:'red',basis:'procurement',m:'Above the €'+fmt(PROC_THRESHOLD)+' threshold with no documented comparison of offers.',fix:'quotes'});
  }
- if(c.date>PERIOD.to||c.date<PERIOD.from) f.push({sev:'red',m:'Dated outside '+PERIOD.label+' — it belongs to another reporting period.',hard:true});
- if(!c.link) f.push({sev:'amber',m:'Not linked to an output. An auditor will ask why this cost was necessary for the action.',fix:'link'});
+ if(c.date>PERIOD.to||c.date<PERIOD.from) f.push({sev:'red',basis:'ineligible-cost',m:'Dated outside '+PERIOD.label+' — it belongs to another reporting period.',hard:true});
+
+ /* An advance is money moved, not money spent. */
+ if(c.t==='advance'&&!c.cleared)
+  f.push({sev:'red',basis:'not-incurred',m:'An advance, declared before it was cleared. Until the underlying costs are reported and accepted, this is money moved and not expenditure incurred.',hard:true});
+
+ /* A payment made in local currency is only as eligible as the rate applied. */
+ const fx=c.local, ref=fx&&ELIG.fxRates?ELIG.fxRates[fx.cur]:undefined;
+ if(fx&&ref){
+  const dev=Math.abs(fx.rate-ref)/ref;
+  if(dev>(ELIG.fxTolerance||0.02)){
+   const at=Math.round(fx.amt*ref);
+   f.push({sev:'red',basis:'ineligible-cost',
+    m:'Converted at '+fx.rate+' '+ELIG.reportingCurrency+'/'+fx.cur+' against '+ELIG.fxSource+' of '+ref+' — '+Math.round(dev*100)+'% apart. At the agreed rate the line is '+eur(at)+', not '+eur(c.a)+'; the difference of '+eur(Math.abs(c.a-at))+' is not eligible.',hard:true});
+  }
+ }
+
+ /* Payroll components the agreement never accepts, whatever the evidence. */
+ const badPay=(c.components||[]).filter(x=>(ELIG.ineligiblePayrollComponents||[]).includes(x));
+ if(badPay.length)
+  f.push({sev:'red',basis:'ineligible-cost',m:'Declared salary includes '+badPay.join(' and ')+'. Those are not eligible payroll components under this agreement, whatever the payroll record shows.',hard:true});
+
+ /* The same overhead, charged twice on the way down the chain. */
+ if(c.indirect&&c.sub&&ELIG.indirectRate)
+  f.push({sev:'red',basis:'ineligible-cost',m:'A sub-implementer’s indirect costs declared as a direct cost, on top of the '+Math.round(ELIG.indirectRate*100)+'% overhead already charged on this action. Auditors record this as cascading.',hard:true});
+
+ if(!c.link) f.push({sev:'amber',basis:'ineligible-project',m:'Not linked to an output. An auditor will ask why this cost was necessary for the action.',fix:'link'});
  return f;
 }
+
+/* Which finding categories this period's own cost lines are actually being
+   checked against. Read from the flags the engine can raise, not asserted. */
+function coveredBases(){
+ const seen={};
+ COSTS.forEach(c=>costFlags(c).forEach(x=>{if(x.basis)seen[x.basis]=true;}));
+ return seen;
+}
+/* What the donor's own auditors report finding, next to what this period is
+   being checked against. The shares are the donor's published figures, not a
+   claim about this action; a programme with no published breakdown renders
+   nothing here rather than borrowing someone else's. */
+function taxonomyPanel(){
+ const tx=ELIG.errorTaxonomy;
+ if(!tx||!Array.isArray(tx.rows)||!tx.rows.length)return '';
+ const covered=coveredBases();
+ const partial={procurement:'threshold and evidence only — whether the procedure itself was sound is a human judgement'};
+ const max=Math.max(...tx.rows.map(r=>r.share))||1;
+ /* Counting a partial category in full would be the overclaim this product
+    exists to argue against, so the two are reported apart. */
+ const decided=tx.rows.filter(r=>covered[r.key]&&!partial[r.key]).reduce((a,r)=>a+r.share,0);
+ const flaggedOnly=tx.rows.filter(r=>covered[r.key]&&partial[r.key]).reduce((a,r)=>a+r.share,0);
+ return panel(`<h2>Checked against what auditors report finding</h2>
+  <div class="small" style="margin-bottom:12px">${esc(tx.note||'')}</div>
+  <table><thead><tr><th>Finding</th><th style="width:34%">Share of error</th><th>On this screen</th></tr></thead><tbody>
+  ${tx.rows.map(r=>{const on=!!covered[r.key];
+   return `<tr>
+    <td>${esc(r.label)}</td>
+    <td><div style="display:flex;align-items:center;gap:8px">
+      <span style="flex:1;height:7px;border-radius:1px;background:var(--line);overflow:hidden;display:block">
+        <span style="display:block;height:100%;width:${Math.round(r.share/max*100)}%;background:${on?'var(--accent)':'var(--faint)'}"></span></span>
+      <span class="mono small" style="width:30px;text-align:right">${r.share}%</span></div></td>
+    <td>${on?`<span class="tag good">checked</span>${partial[r.key]?`<div class="small" style="margin-top:3px">${esc(partial[r.key])}</div>`:''}`
+            :'<span class="tag">not checked</span>'}</td></tr>`;}).join('')}
+  </tbody></table>
+  <div class="small" style="margin-top:10px">${decided}% of the reported error falls in categories a rule here decides on its own${flaggedOnly?`, and a further ${flaggedOnly}% where it can raise the signal but not the judgement`:''}.
+   A category is marked checked because a rule on this data <i>can</i> raise a finding in it — not because nothing was missed, and not as a detection rate. Every flag still needs a human before anything is filed.</div>
+  <div class="small" style="margin-top:7px;color:var(--faint)">Source: ${esc(tx.source)}</div>`);
+}
+
 function costTotals(){
  let total=0,atRisk=0,clean=0;
  COSTS.forEach(c=>{const f=costFlags(c);total+=c.a;
@@ -1874,6 +2017,7 @@ VIEW.financial=function(){
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
      <button class="btn ghost" onclick="go('collect','costs')">Open the cost lines</button>
      <button class="btn" onclick="auditPack()">Assemble the audit pack</button></div>`)
+  +taxonomyPanel()
   +panel(`<h2>Audit trail</h2>${LEDGER.length?LEDGER.map(l=>`<div class="flagline"><span class="mono small">${l.at}</span>
      <span><b>${esc(l.by)}</b> — ${esc(l.what)}: ${esc(l.detail)}</span></div>`).join('')
    :'<div class="small">Empty. Every change to a figure or a document after submission is recorded here with the person and the time.</div>'}`);
