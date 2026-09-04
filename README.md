@@ -7,6 +7,7 @@ Quarterly reporting workspace for grant-funded consortia. Two self-contained HTM
 - `index.html` — the demo workspace. Open it in a browser.
 - `landing.html` — the public page describing it, linking to the demo.
 - `examples/rural-water-points.json` — a second worked programme, to load into it.
+- `examples/partner-return-oblast-vodokanal.json` — a partner return for that programme, to import.
 
 ## Your own period
 
@@ -35,7 +36,7 @@ A reporting period for a four-partner, EU-funded action, run end to end:
 2. **Framework** — indicators, targets, budget headings and six donor rules are extracted, and each rule is bound to the field it will police.
 3. **Collection** — partners file results and cost lines. Figures are checked while they are typed: disaggregation that does not reconcile, a numerator above its denominator, a percentage below the framework floor, a narrative too thin to use, and two of a partner's own sources disagreeing on the same total.
 4. **Costs and audit** — cost lines are checked against documented reasons costs are declared ineligible: personnel time with no signed timesheet, procurement above the threshold with no comparison of offers, a cost dated outside the period, a cost not linked to any output, a bonus that is not eligible, a local-currency payment converted at a rate the agreement does not recognise, an advance declared before it was cleared, a payroll component that is never eligible, and a sub-implementer's overhead charged twice. Each finding names the category it belongs to, so where a donor publishes what its own auditors find, the screen shows which of those categories these rules can raise — and which they cannot. The screen carries two numbers: what was declared, and what would not survive a check today.
-5. **Partner boundary** — each partner checks its own evidence where it sits and sends the verdict, not the file. The sign-in sheets, payroll, invoices and registers stay at the organisation holding them; what crosses is the figures the donor asks for, the status of each local check in one of four words, and a digest binding the figure to the evidence it was checked against. A gap opens a second round of a few dozen bytes rather than a folder. The screen counts both sides — what crossed, and what did not.
+5. **Partner boundary** — each partner checks its own evidence where it sits and sends the verdict, not the file. A partner exports its return as a file it can read in full before it goes; the lead imports it, and a return for the wrong programme, the wrong period, an unknown partner or with a malformed digest is refused whole. The sign-in sheets, payroll, invoices and registers stay at the organisation holding them; what crosses is the figures the donor asks for, the status of each local check in one of four words, and a digest binding the figure to the evidence it was checked against. A gap opens a second round of a few dozen bytes rather than a folder. The screen counts both sides — what crossed, and what did not.
 6. **Reporting** — narrative drafted from the same data, reviewer comments routed to the exact line, consolidation once all returns are approved.
 7. **Hand-over** — the approved figures are encoded for a donor results system (with an indicator-mapping gate) or assembled into a structured interim form with its sub-chapters.
 8. **Signals and funding** — control room, learning questions, and a funding pipeline with a draft-proposal review.
@@ -60,10 +61,9 @@ Working demo on fictional data, and a file contract for running a real period on
 your own. No account, no server, no service behind it. No customers, no pilots.
 
 Known limits before a pilot: one period at a time with no history across
-quarters; one browser, so no accounts, sharing or concurrent editing; partner
-returns other than your own are staged, so on a real programme they are empty
-until there is a way for partners to file; the donor hand-over encodes and
-assembles but submits nothing.
+quarters; one browser and no accounts, so partners exchange returns as files
+rather than sharing a workspace, and two people cannot work the same period at
+once; the donor hand-over encodes and assembles but submits nothing.
 
 The programme, the partners and every figure are invented. The rules the demo enforces follow published guidance on EU grant reporting and audit findings; thresholds and the reporting period belong to a grant agreement and change per action.
 
