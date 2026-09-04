@@ -93,6 +93,57 @@ everywhere. Three more checks are declared by the section that needs them:
 
 Field types (`t`): `number`, `percent`, `text`, `longtext`, `select`, `file`.
 
+## Eligibility: what makes a cost ineligible beyond a missing document
+
+Missing evidence and the procurement threshold are checked from the fields every
+cost line already carries. Four further findings need rules only the grant
+agreement can set, so they are declared:
+
+```json
+"eligibility": {
+  "reportingCurrency": "EUR",
+  "fxSource": "the central bank reference rate for the month of payment",
+  "fxRates": {"KGS": 0.0102},
+  "fxTolerance": 0.02,
+  "indirectRate": 0.05,
+  "ineligiblePayrollComponents": ["provision", "indirect overhead"],
+  "errorTaxonomy": null
+}
+```
+
+The cost lines opt into them:
+
+| Field on a cost line | Raises |
+|---|---|
+| `"local": {"cur": "KGS", "amt": 1360000, "rate": 0.0105}` | The applied rate against `fxRates`, beyond `fxTolerance`. The finding names the euro difference, which is the part that is not eligible. |
+| `"t": "advance", "cleared": false` | An advance declared before it was cleared — money moved, not expenditure incurred. |
+| `"components": ["salary", "provision"]` | Any component named in `ineligiblePayrollComponents`, whatever the payroll record shows. |
+| `"indirect": true, "sub": true` | A sub-implementer's overhead declared as a direct cost on top of `indirectRate`. Auditors record this as cascading. |
+
+A currency used by a cost line with no rate in `fxRates` is a refusal, not a
+silent pass: the conversion cannot be checked, so the file is rejected.
+
+### errorTaxonomy
+
+Optional, and `null` for most programmes. When a donor publishes a breakdown of
+what its own auditors find, put it here and the financial screen shows which
+categories this period's rules can raise a finding in:
+
+```json
+"errorTaxonomy": {
+  "source": "European Court of Auditors, Annual Report 2024, figure 27",
+  "note": "Share of the estimated level of error by type.",
+  "rows": [{"key": "ineligible-cost", "share": 32, "label": "Ineligible costs"}]
+}
+```
+
+`key` matches the `basis` a check carries: `ineligible-cost`, `procurement`,
+`missing-docs`, `ineligible-project`, `not-incurred`, `arithmetic`. The panel
+reports what the rules *can* raise, never a detection rate, and it counts
+`procurement` apart because a threshold is a signal and not a judgement on the
+procedure. Declare no taxonomy and the panel does not render — a programme never
+borrows another donor's figures.
+
 ## Refusals
 
 A file is validated before anything changes, and a bad one changes nothing. The
@@ -103,6 +154,8 @@ period.label: required, must be a non-empty string.
 costs[0].h: "No Such Heading" is not a budget heading in this file.
 template.sections[0].ind: "NOPE" is not an indicator in this file.
 mapping.W1: "EB-99" is not a core indicator in this file.
+costs[3].local.cur: "UZS" has no rate in eligibility.fxRates, so the conversion cannot be checked.
+eligibility.errorTaxonomy.source: required — a published breakdown has to say whose it is.
 ```
 
 ## The period, and getting it out
