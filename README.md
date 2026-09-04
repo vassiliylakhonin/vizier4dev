@@ -6,6 +6,26 @@ Quarterly reporting workspace for grant-funded consortia. Two self-contained HTM
 
 - `index.html` — the demo workspace. Open it in a browser.
 - `landing.html` — the public page describing it, linking to the demo.
+- `examples/rural-water-points.json` — a second worked programme, to load into it.
+
+## Your own period
+
+**Data → Load a programme file** replaces the demo's action with yours: your
+framework, donor rules, budget, partners, cost lines and return template, under
+the same rules engine. **Data → Download this one as a template** writes the
+demo out as a valid file to start from, and
+[`docs/programme-file.md`](docs/programme-file.md) is the contract.
+
+Still no backend. The file is read in the browser, the working period is saved
+in that browser and restored on reload, and what leaves is what you export —
+either the period package (figures, verdicts, approvals, the ledger) or nothing.
+
+A loaded programme drops the demo's staged content: the pre-filled draft, the
+source conflict, the other partners' returns already on file, the canned review,
+the worked findings and the Q&A. Those screens then say what is missing rather
+than showing an invented figure. What stays working is what is actually
+computed — the donor checks, the cost-eligibility flags, the partner boundary,
+the aggregation into consortium figures, the hand-over gates.
 
 ## What it demonstrates
 
@@ -36,7 +56,14 @@ What Vizier says to you is translated. What comes out of the donor's own documen
 
 ## Status
 
-Working demo on fictional data. No account, no storage, no service behind it. No customers, no pilots.
+Working demo on fictional data, and a file contract for running a real period on
+your own. No account, no server, no service behind it. No customers, no pilots.
+
+Known limits before a pilot: one period at a time with no history across
+quarters; one browser, so no accounts, sharing or concurrent editing; partner
+returns other than your own are staged, so on a real programme they are empty
+until there is a way for partners to file; the donor hand-over encodes and
+assembles but submits nothing.
 
 The programme, the partners and every figure are invented. The rules the demo enforces follow published guidance on EU grant reporting and audit findings; thresholds and the reporting period belong to a grant agreement and change per action.
 

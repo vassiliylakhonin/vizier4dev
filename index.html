@@ -177,7 +177,7 @@ button.handle:hover{color:var(--ink);background:var(--line-2);}
 <a class="skip" href="#surface">Skip to the workspace</a>
 <header class="top">
   <div class="wordmark">Vizier<i>4dev</i></div>
-  <div class="proj"><b>Cold Chain for Rural Clinics</b><span id="projline">€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period</span></div>
+  <div class="proj"><b id="projtitle">Cold Chain for Rural Clinics</b><span id="projline">€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period</span></div>
   <div class="grow"></div>
   <div class="cmd"><span class="small" aria-hidden="true">?</span>
     <label class="skip" for="cmd">Ask this programme a question</label>
@@ -192,6 +192,7 @@ button.handle:hover{color:var(--ink);background:var(--line-2);}
     <button id="lang-en" aria-pressed="true" onclick="setLang('en')">EN</button>
     <button id="lang-ru" aria-pressed="false" onclick="setLang('ru')">RU</button></div>
   <button class="tbtn" id="b-tour" onclick="startTour()">Tour</button>
+  <button class="tbtn" id="b-data" onclick="openData()">Data</button>
   <button class="tbtn" id="b-reset" onclick="resetDemo()">Reset</button>
 </header>
 <nav class="tabs" id="tabs" aria-label="Workspaces"></nav>
@@ -206,6 +207,8 @@ button.handle:hover{color:var(--ink);background:var(--line-2);}
   <main class="surface" id="surface" tabindex="-1"></main>
 </div>
 
+<input type="file" id="progfile" class="hidden" accept="application/json,.json"
+       aria-label="Programme file" onchange="readProgramme(this)"/>
 <div id="toast" class="hidden" role="status" aria-live="polite"></div>
 <div id="coach" class="hidden" role="region" aria-label="Guided tour"></div>
 
@@ -215,8 +218,18 @@ button.handle:hover{color:var(--ink);background:var(--line-2);}
    Structure: six workspaces + a role-aware work queue + a command bar.
    ========================================================================== */
 
+/* --------------------------- programme seeds ---------------------------- */
+/* SEED holds what a loaded programme seeds a fresh period with. It stays null
+   until applyProgramme runs, so the demo boots on its own fixtures unchanged.
+   See "PROGRAMME: DEMO OR REAL" below for the boundary this draws. */
+let SEED=null;
+function clone(x){return x==null?x:JSON.parse(JSON.stringify(x));}
+function defaultCosts(){return SEED?clone(SEED.costs):demoCosts();}
+function defaultTemplate(){return SEED?clone(SEED.template):demoTemplate();}
+function defaultNarr(){return SEED?clone(SEED.narrative):demoNarr();}
+
 /* ------------------------------ sources -------------------------------- */
-const SRC={
+let SRC={
  call:{name:'Call for proposals — INTPA/TER/2025/04.pdf',type:'PDF',size:'1.1 MB',text:
 `EUROPEAN UNION — DG INTPA
 CALL FOR PROPOSALS INTPA/TER/2025/04
@@ -328,16 +341,16 @@ Session sign-in sheet raw total (NOT deduplicated): 1,140
 };
 
 /* ------------------------------ model ---------------------------------- */
-const INDICATORS=[
+let INDICATORS=[
  {code:'OC1.1',label:'Vaccine potency at point of use',unit:'%',base:'82',target:'≥97',lead:'THT',need:'Numerator + denominator + logger export',anchor:'OC1.1 - Vaccine potency at point of use'},
  {code:'OP1.1',label:'Clinics with functioning equipment',unit:'clinics',base:'0',target:'240',lead:'THT',need:'Count + means of verification',anchor:'OP1.1 - Clinics with functioning cold chain equipment'},
- {code:'OP1.3',label:'Clinic maintenance teams operating',unit:'teams',base:'0',target:'18',lead:'THT',need:'Count + % female membership (≥40%)',anchor:'OP1.3 - Clinic maintenance teams operating'},
+ {code:'OP1.3',label:'Clinic maintenance teams operating',unit:'teams',base:'0',target:'18',lead:'THT',need:'Count + % female membership (≥40%)',anchor:'OP1.3 - Clinic maintenance teams operating',agg:{type:'none',note:'a consortium-wide count, not a sum of partner rosters'}},
  {code:'OP2.1',label:'Deliveries inside the scheduled window',unit:'deliveries',base:'-',target:'4,800',lead:'SLC',need:'Count + dispatch records',anchor:'OP2.1 - Deliveries completed within the scheduled window'},
- {code:'OC2.2',label:'Health workers confident in the cold chain',unit:'%',base:'38',target:'≥75',lead:'RCC',need:'Numerator + denominator + survey note',anchor:'OC2.2 - Health workers reporting confidence in the cold chain'},
- {code:'OP3.1',label:'Health workers trained and certified',unit:'people',base:'-',target:'3,600',lead:'RCC/THT',need:'Disaggregate by sex / age / disability',anchor:'OP3.1 - Health workers trained and certified'},
- {code:'CC1',label:'Feedback response rate',unit:'%',base:'-',target:'≥85',lead:'RCC',need:'Numerator + denominator + MoV',anchor:'CC1 - Feedback response rate'},
+ {code:'OC2.2',label:'Health workers confident in the cold chain',unit:'%',base:'38',target:'≥75',lead:'RCC',need:'Numerator + denominator + survey note',anchor:'OC2.2 - Health workers reporting confidence in the cold chain',agg:{type:'ratio',num:'Reporting confidence (numerator)',den:'Surveyed (denominator)',unit:'%'}},
+ {code:'OP3.1',label:'Health workers trained and certified',unit:'people',base:'-',target:'3,600',lead:'RCC/THT',need:'Disaggregate by sex / age / disability',anchor:'OP3.1 - Health workers trained and certified',agg:{type:'sum',field:'Total certified (in-period)'}},
+ {code:'CC1',label:'Feedback response rate',unit:'%',base:'-',target:'≥85',lead:'RCC',need:'Numerator + denominator + MoV',anchor:'CC1 - Feedback response rate',agg:{type:'ratio',num:'Answered within 14 days (numerator)',den:'Feedback items received (denominator)',unit:'%'}},
 ];
-const RULES=[
+let RULES=[
  {t:'Quarterly partner returns',d:'Within 15 working days of quarter end',anchor:'Partner -> Lead: quarterly'},
  {t:'Disaggregation is mandatory',d:'Sex, age band and disability on every person-level indicator',anchor:'All "people" indicators MUST be disaggregated'},
  {t:'No bare percentages',d:'Numerator and denominator required, or the figure is rejected',anchor:'Report numerator AND denominator'},
@@ -345,7 +358,7 @@ const RULES=[
  {t:'Explain >10% budget deviation',d:'Per heading, inside the narrative report',anchor:'Explain any heading deviation above 10%'},
  {t:'Safeguarding subsection',d:'Mandatory; a nil return must be signed',anchor:'The narrative report MUST contain a safeguarding subsection'},
 ];
-const BUDGET=[
+let BUDGET=[
  {h:'Cold chain equipment',b:1102000,q1p:132000,q1a:104000},
  {h:'Last-mile transport & fuel',b:836000,q1p:96000,q1a:99000},
  {h:'Human resources',b:798000,q1p:88000,q1a:86000},
@@ -357,9 +370,9 @@ const BUDGET=[
 ];
 /* Cost lines for the partner's Q1 financial return. `have` = evidence already on file.
    Thresholds below are the programme's own procurement rule, carried from the grant agreement. */
-const PROC_THRESHOLD=10000;
-const PERIOD={from:'2026-01-01',to:'2026-03-31',label:'Q1 2026'};
-function defaultCosts(){return [
+let PROC_THRESHOLD=10000;
+let PERIOD={from:'2026-01-01',to:'2026-03-31',label:'Q1 2026'};
+function demoCosts(){return [
  {id:'C-101',h:'Human resources',d:'MEL officer — 0.6 FTE, January to March',a:14200,t:'staff',date:'2026-03-31',link:'',have:['invoice','payroll']},
  {id:'C-102',h:'Human resources',d:'Community mobilisers ×6 — Q1 field work',a:21800,t:'staff',date:'2026-03-31',link:'OP3.1',have:['invoice','payroll','timesheet'],mismatch:true},
  {id:'C-103',h:'Training & certification',d:'Certification workshops ×14 — venue, catering, materials',a:18600,t:'procure',date:'2026-02-18',link:'OP3.1',have:['invoice','contract','quotes']},
@@ -376,7 +389,7 @@ function logEvent(what,detail){LEDGER.unshift({at:new Date().toLocaleTimeString(
 
 /* Illustrative mapping targets. The live product loads the donor's current official list;
    the labels below stand in for it and are not quoted as official codes. */
-const CORE_IND=[
+let CORE_IND=[
  {c:'CI-01',l:'People with access to essential health services'},
  {c:'CI-02',l:'Health facilities equipped or rehabilitated'},
  {c:'CI-03',l:'Health personnel trained (disaggregated)'},
@@ -385,38 +398,41 @@ const CORE_IND=[
 ];
 let MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
 
-const ME='Riverbend Community Care';
-const PARTNERS=['Terrace Health Trust',ME,'Summit Logistics Cooperative'];
+let ME='Riverbend Community Care';
+let PARTNERS=['Terrace Health Trust',ME,'Summit Logistics Cooperative'];
 const FTYPES={number:'Number',percent:'Percentage (n/d)',text:'Short text',longtext:'Narrative',select:'Choice',file:'Evidence file'};
 
-function defaultTemplate(){return{
+function demoTemplate(){return{
  name:'Quarterly partner return — Q1',status:'draft',
  sections:[
   {ind:'OP3.1',title:'Health workers trained and certified',why:'Donor rule: person-level indicators must be disaggregated by sex, age band and disability.',anchor:'All "people" indicators MUST be disaggregated',
+   reconcile:{total:'Total certified (in-period)',parts:['Female','Male'],tol:1},
    fields:[{l:'Total certified (in-period)',t:'number',req:true},{l:'Female',t:'number',req:true},{l:'Male',t:'number',req:true},
            {l:'Under-30',t:'number',req:true},{l:'Health workers with disability',t:'number',req:true},
            {l:'Means of verification',t:'text',req:true},{l:'Evidence',t:'file',req:false}]},
   {ind:'CC1',title:'Feedback response rate',why:'Donor rule: percentages need a numerator and a denominator.',anchor:'Report numerator AND denominator',
    fields:[{l:'Answered within 14 days (numerator)',t:'number',req:true},{l:'Feedback items received (denominator)',t:'number',req:true},{l:'Means of verification',t:'text',req:true}]},
   {ind:'OC2.2',title:'Health workers confident in the cold chain',why:'Perception survey — report numerator, denominator and what drives the gap.',anchor:'OC2.2 - Health workers reporting confidence in the cold chain',
+   expect:{field:'Narrative / barriers noted',minLen:50,
+    words:['confiden','logger','training','fridge','power','outage','supervis','distance','spare','alarm','temperature'],
+    topic:'what actually drives confidence — power outages, logger alarms, spare parts, supervision'},
    fields:[{l:'Reporting confidence (numerator)',t:'number',req:true},{l:'Surveyed (denominator)',t:'number',req:true},{l:'Narrative / barriers noted',t:'longtext',req:false}]},
   {ind:'OP1.3',title:'Clinic maintenance teams operating',why:'Count plus female membership share (target ≥40%).',anchor:'OP1.3 - Clinic maintenance teams operating',
+   floor:{field:'Female members (%)',min:40,msg:'Below the 40% floor in the results framework.'},
    fields:[{l:'Teams operating',t:'number',req:true},{l:'Female members (%)',t:'percent',req:true},{l:'Means of verification',t:'text',req:true}]},
  ]};}
 
-const DRAFT={
+let DRAFT={
  'OP3.1':{'Female':'470','Male':'342','Under-30':'214','Health workers with disability':'61','Means of verification':'Certification register + session sign-in sheets (Q1)'},
  'CC1':{'Answered within 14 days (numerator)':'163','Feedback items received (denominator)':'185','Means of verification':'Feedback log export (Q1)'},
  'OP1.3':{'Teams operating':'11','Female members (%)':'44','Means of verification':'Team rosters and maintenance logs (Q1)'},
 };
-const DRAFT_NOTE='Drafted from RCC’s Q1 training logs and feedback export. Verify every figure before you submit.';
-const CONFLICT={ind:'OP3.1',field:'Total certified (in-period)',options:[
+let DRAFT_NOTE='Drafted from RCC’s Q1 training logs and feedback export. Verify every figure before you submit.';
+let CONFLICT={ind:'OP3.1',field:'Total certified (in-period)',options:[
  {v:'812',note:'Deduplicated certification register',ok:true},
  {v:'1,140',note:'Raw session sign-in total',ok:false}]};
-const NARR_EXPECT={ind:'OC2.2',words:['confiden','logger','training','fridge','power','outage','supervis','distance','spare','alarm','temperature'],
- topic:'what actually drives confidence — power outages, logger alarms, spare parts, supervision'};
 
-const OTHER_SUB={
+let OTHER_SUB={
  'Terrace Health Trust':{'OP3.1':{'Total certified (in-period)':'1,240','Female':'690','Male':'550','Under-30':'318','Health workers with disability':'88','Means of verification':'Certification register (Q1)'},
    'CC1':{'Answered within 14 days (numerator)':'171','Feedback items received (denominator)':'196','Means of verification':'Feedback log (Q1)'},
    'OC2.2':{'Reporting confidence (numerator)':'402','Surveyed (denominator)':'700','Narrative / barriers noted':'Confidence is highest where a maintenance team visited in the last 60 days.'},
@@ -426,7 +442,7 @@ const OTHER_SUB={
    'OC2.2':{'Reporting confidence (numerator)':'268','Surveyed (denominator)':'420','Narrative / barriers noted':'Handlers cite fuel shortages on the northern route as the main risk to the window.'},
    'OP1.3':{'Teams operating':'6','Female members (%)':'33','Means of verification':'Rosters (Q1)'}},
 };
-const AI_REVIEW={
+let AI_REVIEW={
  'Riverbend Community Care':[
   {t:'Source conflict resolved',d:'OP3.1 was reconciled from two conflicting sources (812 vs 1,140). Confirm the sign-in sheet gets corrected so this does not recur next quarter.',sev:'warn'},
   {t:'Thin narrative to watch',d:'OC2.2 has no substantive explanation. Ask RCC for the concrete barriers — outages, alarms, spare parts — and what was done about them.',sev:'warn'},
@@ -439,7 +455,7 @@ const AI_REVIEW={
   {t:'Double-counting risk',d:'SLC and RCC both trained handlers in Terrace district. Verify deduplication across partners before consolidation.',sev:'warn'}],
 };
 
-function defaultNarr(){return{title:'Q1 narrative report — Cold Chain for Rural Clinics',status:'draft',_t:null,sections:[
+function demoNarr(){return{title:'Q1 narrative report — Cold Chain for Rural Clinics',status:'draft',_t:null,sections:[
  {id:'exec',t:'1. Executive summary',g:'Key results, deviations and decisions this quarter, in plain language.',
   v:'In Q1 the consortium equipped 96 clinics with functioning cold chain units, certified 2,656 health workers, and ran a feedback mechanism answering 86% of items within 14 days. Vaccine potency at point of use rose from 82% to 91% against a 97% target; maintenance team formation is behind schedule.',
   flags:[],comments:[],attach:[],need:[]},
@@ -458,18 +474,18 @@ function defaultNarr(){return{title:'Q1 narrative report — Cold Chain for Rura
   v:'Refrigerator shipments were delayed at the port; crews were redeployed to site preparation and training to avoid idle time.',
   flags:[],comments:[],attach:[],need:[]},
 ]};}
-const NARR_DRAFT={
+let NARR_DRAFT={
  ctx:'Grid interruptions in the northern districts averaged 6.4 hours per day in Q1, up from 4.1 in the previous quarter, which extended equipment commissioning times. Road access remained stable. Diesel prices rose 14%, raising last-mile transport costs against plan. No new security constraints were reported.',
  o1:'Ninety-six clinics received solar direct-drive refrigerators and temperature loggers, verified against the per-clinic installation sign-off register. Eleven of eighteen maintenance teams are operating, covering 71 of the 96 equipped clinics; the remaining teams are blocked on spare-part procurement. Logger exports show vaccine potency at point of use rising from 82% to 91%.',
  cc:'The feedback line handled 561 items across the consortium with an 86% response rate within 14 days; 34% came from women and health workers with disability against a 40% floor, prompting supervised drop-in desks at clinic level next quarter. Safeguarding: two low-level concerns were logged and closed under policy, and focal points are active at all four partners. Environmental: refrigerant disposal followed the provincial protocol and was documented for all 96 units.',
 };
 
-const LEARNING_Q=[
+let LEARNING_Q=[
  'Which maintenance arrangements keep cold chain equipment running after installation?',
  'What makes health workers trust the cold chain enough to change practice?',
  'Does the feedback mechanism reach women and health workers with disability?',
 ];
-const FINDINGS=[
+let FINDINGS=[
  {lq:'LQ1',q:'Which maintenance arrangements sustain equipment?',
   finding:'Clinics covered by a maintenance team within 60 days report 34% fewer equipment failures. Only 11 of the 18 planned teams are operating.',
   action:'Stand up the remaining seven teams in the northern districts; copy the Terrace roster model that hit 42% female membership.',
@@ -484,18 +500,18 @@ const FINDINGS=[
   conf:'High',src:[['logf','CC2 - Inclusive reach of the feedback mechanism']],check:false},
 ];
 
-const OPPS=[
+let OPPS=[
  {t:'Immunisation supply chain — second phase',donor:'EU / DG INTPA',fit:91,deadline:'in 21 days',why:['direct continuation of this action','existing INTPA track record','presence in the target province'],gap:''},
  {t:'Health workforce certification at scale',donor:'Gavi',fit:76,deadline:'in 34 days',why:['3,600-worker certification pipeline','partner-led delivery'],gap:'no prior Gavi contract'},
  {t:'Off-grid energy for health facilities',donor:'FCDO',fit:62,deadline:'in 11 days',why:['solar direct-drive experience'],gap:'no energy-sector lead; tight deadline'},
 ];
-const PROP_REVIEW={fit:74,
+let PROP_REVIEW={fit:74,
  strengths:['Proven delivery record — 186 clinics equipped in the previous action','Genuine localisation: 54% partner-led','Feedback mechanism running at a 91% response rate'],
  gaps:['Maintenance cost-recovery beyond the action is thin','The theory of change does not map cleanly onto the donor’s outcome wording','No cost-per-clinic efficiency figures'],
  asks:['Attach the final report of the previous action (found 1: Terrace Cold Chain 2022-2024)','Attach 2 capability statements','Attach an audited financial summary'],
 };
 
-const QA=[
+let QA=[
  {q:'What is our cost per clinic equipped this quarter?',
   a:'Q1 equipment spend was <b>€104,000</b> across <b>96 clinics</b> — an interim <b>≈€1,083 per clinic</b>. Unit cost should fall as crews stop travelling between districts for small batches.',
   src:[['budg','Cold chain equipment'],['logf','OP1.1 - Clinics with functioning cold chain equipment']]},
@@ -515,6 +531,247 @@ const QA=[
   a:'Your queue on the left is the answer: it is rebuilt from the donor rules and the state of the period every time anything changes.',
   src:[['guide','QUALITY BAR']]},
 ];
+
+/* ====================== PROGRAMME: DEMO OR REAL ========================= */
+/* Everything above this line is one programme's data. By default it is the
+   demo's fictional action; a consortium reporting a real period loads its own
+   programme file and gets the same rules engine over its own framework,
+   budget, partners and cost lines.
+
+   Nothing is uploaded. The file is read in this browser, the working period is
+   kept in this browser, and what leaves is what you deliberately export.
+
+   Two things are separated on purpose:
+
+     data     indicators, rules, budget, sources, partners, cost lines, the
+              return template, the narrative skeleton. A loaded programme
+              replaces all of it.
+
+     staging  the demo's scripted moments — the pre-filled draft, the source
+              conflict, the other partners' returns already on file, the canned
+              review, the worked findings, the funding pipeline, the Q&A. That
+              is fiction. A loaded programme drops it, and the screens that
+              showed it say what is missing instead of inventing something. */
+
+const PROG_SCHEMA='vizier4dev/programme@1';
+const PERIOD_SCHEMA='vizier4dev/period@1';
+let PROG={id:'demo-cold-chain',mode:'demo',title:'Cold Chain for Rural Clinics',
+ line:{en:'€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period',
+       ru:'€3,8 млн · EU / DG INTPA · консорциум из 4 партнёров · отчётный период Q1'}};
+let MAPPING_SEED={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
+let PLQ_SEED=['How is the alarm-response routine landing with clinic staff?'];
+/* Indicators the demo reports from outside the partner returns. A loaded
+   programme has none, and those rows stay empty rather than borrowing these. */
+let IND_FALLBACK={'OP1.3':'11','OC1.1':'91%','OP1.1':'96','OP2.1':'1,104'};
+/* True once a real programme is loaded: the staging above is gone and no screen
+   may invent a figure to fill the space it left. */
+function live(){return PROG.mode!=='demo';}
+function progLine(){return (PROG.line&&PROG.line[LANG])||(PROG.line&&PROG.line.en)||'';}
+
+/* ---------------------------- the file ---------------------------------- */
+/* One programme is one JSON file. `staging` is optional and only the demo
+   carries it; a consortium's file has data and nothing else. */
+function programmeSnapshot(){
+ return{schema:PROG_SCHEMA,id:PROG.id,mode:PROG.mode,title:PROG.title,line:clone(PROG.line),
+  period:clone(PERIOD),me:ME,partners:clone(PARTNERS),procurementThreshold:PROC_THRESHOLD,
+  sources:clone(SRC),indicators:clone(INDICATORS),rules:clone(RULES),budget:clone(BUDGET),
+  coreIndicators:clone(CORE_IND),mapping:clone(MAPPING_SEED),silo:clone(SILO),
+  costs:defaultCosts(),template:defaultTemplate(),narrative:defaultNarr(),
+  learningQuestions:clone(LEARNING_Q),
+  staging:live()?null:{draft:clone(DRAFT),draftNote:DRAFT_NOTE,conflict:clone(CONFLICT),
+   otherSub:clone(OTHER_SUB),aiReview:clone(AI_REVIEW),
+   narrDraft:clone(NARR_DRAFT),findings:clone(FINDINGS),opps:clone(OPPS),
+   propReview:clone(PROP_REVIEW),qa:clone(QA),partnerQuestions:clone(PLQ_SEED),
+   indicatorFallback:clone(IND_FALLBACK)}};
+}
+
+function applyProgramme(p){
+ PROG={id:p.id,mode:p.mode||'live',title:p.title,
+  line:typeof p.line==='string'?{en:p.line,ru:p.line}:clone(p.line||{en:'',ru:''})};
+ PERIOD=clone(p.period);ME=p.me;PARTNERS=clone(p.partners);PROC_THRESHOLD=p.procurementThreshold;
+ SRC=clone(p.sources);INDICATORS=clone(p.indicators);RULES=clone(p.rules);BUDGET=clone(p.budget);
+ CORE_IND=clone(p.coreIndicators||[]);SILO=clone(p.silo||{});LEARNING_Q=clone(p.learningQuestions||[]);
+ SEED={costs:clone(p.costs||[]),template:clone(p.template),narrative:clone(p.narrative)};
+ /* Every indicator gets a mapping slot whether the file names one or not, so the
+    handover gate counts unmapped indicators rather than silently skipping them. */
+ MAPPING_SEED={};INDICATORS.forEach(i=>{MAPPING_SEED[i.code]=(p.mapping||{})[i.code]||'';});
+ const st=p.staging||null;
+ DRAFT=clone(st&&st.draft||{});DRAFT_NOTE=st&&st.draftNote||'';
+ CONFLICT=clone(st&&st.conflict||null);
+ OTHER_SUB=clone(st&&st.otherSub||{});AI_REVIEW=clone(st&&st.aiReview||{});
+ NARR_DRAFT=clone(st&&st.narrDraft||{});FINDINGS=clone(st&&st.findings||[]);
+ OPPS=clone(st&&st.opps||[]);QA=clone(st&&st.qa||[]);
+ PROP_REVIEW=clone(st&&st.propReview||{fit:0,strengths:[],gaps:[],asks:[]});
+ PLQ_SEED=clone(st&&st.partnerQuestions||[]);IND_FALLBACK=clone(st&&st.indicatorFallback||{});
+ resetPeriod();
+}
+
+/* ------------------------------ validation ------------------------------ */
+/* The same discipline the product applies to a partner return, applied to its
+   own configuration: say which field is wrong and what it should have been.
+   A programme that references an indicator or a budget heading it does not
+   define is rejected here rather than half-rendering later. */
+function validateProgramme(p){
+ const e=[];
+ if(!p||typeof p!=='object'||Array.isArray(p))return['The file does not contain a JSON object.'];
+ if(p.schema!==PROG_SCHEMA)e.push('schema: expected "'+PROG_SCHEMA+'", found '+JSON.stringify(p.schema)+'.');
+ const str=(k,v)=>{if(typeof v!=='string'||!v.trim())e.push(k+': required, must be a non-empty string.');};
+ const arr=(k,v)=>{if(!Array.isArray(v)||!v.length){e.push(k+': required, must be a non-empty array.');return false;}return true;};
+ str('id',p.id);str('title',p.title);str('me',p.me);
+ if(!p.period||typeof p.period!=='object')e.push('period: required, must be {from,to,label}.');
+ else{['from','to','label'].forEach(k=>str('period.'+k,p.period[k]));
+  if(p.period.from&&p.period.to&&p.period.from>p.period.to)e.push('period: "from" is later than "to".');}
+ if(typeof p.procurementThreshold!=='number'||!(p.procurementThreshold>=0))
+  e.push('procurementThreshold: required, must be a number of euro at or above 0.');
+ const codes=[];
+ if(arr('indicators',p.indicators))p.indicators.forEach((i,ix)=>{
+  if(!i||typeof i.code!=='string'||!i.code.trim()){e.push('indicators['+ix+'].code: required.');return;}
+  if(codes.indexOf(i.code)>=0)e.push('indicators['+ix+'].code: "'+i.code+'" is used twice.');
+  codes.push(i.code);
+  ['label','target','lead','need'].forEach(k=>{if(typeof i[k]!=='string')e.push('indicators['+ix+'].'+k+': required.');});});
+ arr('rules',p.rules);
+ const heads=[];
+ if(arr('budget',p.budget))p.budget.forEach((b,ix)=>{
+  if(!b||typeof b.h!=='string'||!b.h.trim()){e.push('budget['+ix+'].h: heading required.');return;}
+  heads.push(b.h);
+  ['b','q1p','q1a'].forEach(k=>{if(typeof b[k]!=='number')e.push('budget['+ix+'].'+k+': must be a number.');});});
+ if(arr('partners',p.partners)&&typeof p.me==='string'&&p.partners.indexOf(p.me)<0)
+  e.push('me: "'+p.me+'" is not one of the partners listed.');
+ if(!Array.isArray(p.costs))e.push('costs: required, may be an empty array.');
+ else p.costs.forEach((c,ix)=>{
+  if(!c||typeof c.id!=='string')  {e.push('costs['+ix+'].id: required.');return;}
+  if(typeof c.a!=='number')e.push('costs['+ix+'].a: amount must be a number.');
+  if(heads.length&&heads.indexOf(c.h)<0)e.push('costs['+ix+'].h: "'+c.h+'" is not a budget heading in this file.');
+  if(c.link&&codes.length&&codes.indexOf(c.link)<0)e.push('costs['+ix+'].link: "'+c.link+'" is not an indicator in this file.');});
+ if(!p.template||!Array.isArray(p.template.sections)||!p.template.sections.length)
+  e.push('template.sections: required, the partner return needs at least one section.');
+ else p.template.sections.forEach((s,ix)=>{
+  if(codes.length&&codes.indexOf(s.ind)<0)e.push('template.sections['+ix+'].ind: "'+s.ind+'" is not an indicator in this file.');
+  if(!Array.isArray(s.fields)||!s.fields.length)e.push('template.sections['+ix+'].fields: at least one field required.');});
+ if(!p.narrative||!Array.isArray(p.narrative.sections))e.push('narrative.sections: required, may be an empty array.');
+ const core=(p.coreIndicators||[]).map(c=>c&&c.c);
+ Object.keys(p.mapping||{}).forEach(k=>{
+  if(codes.length&&codes.indexOf(k)<0)e.push('mapping: "'+k+'" is not an indicator in this file.');
+  const v=(p.mapping||{})[k];if(v&&core.indexOf(v)<0)e.push('mapping.'+k+': "'+v+'" is not a core indicator in this file.');});
+ Object.keys(p.silo||{}).forEach(k=>{
+  if(Array.isArray(p.partners)&&p.partners.indexOf(k)<0)e.push('silo: "'+k+'" is not one of the partners listed.');});
+ return e;
+}
+
+/* --------------------------- files in and out ---------------------------- */
+/* No network: a file picker and FileReader on the way in, a Blob the browser
+   saves on the way out. The page never opens a connection. */
+function saveJSON(name,obj){
+ const text=JSON.stringify(obj,null,2);
+ try{
+  const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast('Saved '+name);
+ }catch(err){
+  /* A browser that refuses the download still has to give the operator the file. */
+  drawer('<h2>'+esc(name)+'</h2><div class="small" style="margin:6px 0 10px">This browser would not save the file. Select the text below and save it yourself.</div>'
+   +'<textarea readonly style="width:100%;height:320px;font:12px/1.5 var(--mono, monospace)">'+esc(text)+'</textarea>');
+ }
+}
+function pickProgramme(){const i=document.getElementById('progfile');if(i){i.value='';i.click();}}
+function readProgramme(input){
+ const f=input&&input.files&&input.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onerror=function(){dataProblem(['The file could not be read.']);};
+ r.onload=function(){
+  let p;try{p=JSON.parse(r.result);}catch(err){return dataProblem(['That file is not valid JSON: '+err.message]);}
+  const errs=validateProgramme(p);
+  if(errs.length)return dataProblem(errs);
+  p.mode='live';applyProgramme(p);saveWork();render();
+  toast('Loaded '+PROG.title+' — '+PERIOD.label);
+ };
+ r.readAsText(f);
+}
+function dataProblem(errs){
+ drawer('<h2>This file was not loaded</h2>'
+  +'<div class="small" style="margin:6px 0 12px">Nothing changed. Fix the lines below and load it again.</div>'
+  +'<ul style="margin:0;padding-left:18px">'+errs.map(x=>'<li class="small" style="margin-bottom:5px">'+esc(x)+'</li>').join('')+'</ul>');
+}
+
+/* The period package is what a lead hands on: the figures, the verdicts behind
+   them, what was approved, and the trail of who changed what. Source documents
+   are not in it — they stay where they are held. */
+function periodPackage(){
+ return{schema:PERIOD_SCHEMA,exportedAt:new Date().toISOString(),
+  programme:{id:PROG.id,title:PROG.title,mode:PROG.mode},period:clone(PERIOD),
+  partners:clone(PARTNERS),returns:clone(SUB),localVerdicts:clone(VERIFY),
+  approved:clone(APPROVED),comments:clone(COMMENTS),costs:clone(COSTS),
+  mapping:clone(MAPPING),narrative:clone(NARRATIVE),crossed:clone(WIRE),ledger:clone(LEDGER)};
+}
+function fileStem(){return (PROG.id||'programme').replace(/[^a-z0-9_-]+/gi,'-').toLowerCase();}
+function exportProgramme(){saveJSON(fileStem()+'-programme.json',programmeSnapshot());}
+function exportPeriod(){saveJSON(fileStem()+'-'+String(PERIOD.label||'period').replace(/\s+/g,'-')+'-package.json',periodPackage());}
+
+/* ---------------------- the period, kept in this browser ----------------- */
+/* A reporting period is weeks of work. It survives a reload here and nowhere
+   else: no account, no server, and clearing the browser clears it. Anything
+   that must outlive this browser has to be exported. */
+const WORK_KEY='v4d_work_v1';
+let SAVED_AT=null,SAVE_T=null;
+function workState(){
+ return{v:1,at:new Date().toISOString(),programme:programmeSnapshot(),
+  period:{TPL,NARRATIVE,SUB,VERIFY,COMMENTS,APPROVED,LQS,PLQ,PIPELINE,COSTS,LEDGER,WIRE,ENV_SENT,ANSWERS,MAPPING,S}};
+}
+function saveWork(){
+ try{localStorage.setItem(WORK_KEY,JSON.stringify(workState()));SAVED_AT=new Date();}
+ catch(err){SAVED_AT=null;}
+}
+function saveSoon(){clearTimeout(SAVE_T);SAVE_T=setTimeout(saveWork,400);}
+function loadWork(){
+ let raw=null;try{raw=localStorage.getItem(WORK_KEY);}catch(err){return false;}
+ if(!raw)return false;
+ let w;try{w=JSON.parse(raw);}catch(err){return false;}
+ if(!w||w.v!==1||validateProgramme(w.programme).length)return false;
+ applyProgramme(w.programme);
+ const d=w.period||{};
+ if(d.TPL)TPL=d.TPL;if(d.NARRATIVE)NARRATIVE=d.NARRATIVE;
+ SUB=d.SUB||{};VERIFY=d.VERIFY||{};COMMENTS=d.COMMENTS||{};APPROVED=d.APPROVED||{};
+ LQS=d.LQS||[];PLQ=d.PLQ||[];PIPELINE=d.PIPELINE||[];
+ if(Array.isArray(d.COSTS))COSTS=d.COSTS;
+ LEDGER=d.LEDGER||[];WIRE=d.WIRE||[];ENV_SENT=d.ENV_SENT||{};ANSWERS=d.ANSWERS||{};
+ if(d.MAPPING)MAPPING=d.MAPPING;
+ if(d.S)Object.assign(S,d.S);
+ SAVED_AT=w.at?new Date(w.at):null;
+ return true;
+}
+function clearWork(){
+ try{localStorage.removeItem(WORK_KEY);}catch(err){}
+ SAVED_AT=null;applyProgramme(DEMO_PROGRAMME);render();toast('Saved work cleared. Back to the demo programme.');
+}
+
+/* ------------------------------- the panel ------------------------------- */
+function dataPanel(){
+ const saved=SAVED_AT?SAVED_AT.toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}):'not saved in this browser';
+ return '<h2>Programme and data</h2>'
+ +'<div class="small" style="margin:6px 0 14px">Nothing here leaves this browser. Files are read locally and exports are saved by you.</div>'
+ +'<div class="note" style="margin-bottom:12px"><div class="lbl">Loaded now</div>'
+  +'<div style="font-family:var(--serif);font-size:17px;margin:3px 0">'+esc(PROG.title)+'</div>'
+  +'<div class="small">'+esc(PERIOD.label)+' · '+esc(PERIOD.from)+' to '+esc(PERIOD.to)+' · '+PARTNERS.length+' partners · '+INDICATORS.length+' indicators · '+RULES.length+' donor rules</div>'
+  +'<div class="small" style="margin-top:6px"><span class="tag '+(live()?'acc':'')+'">'+(live()?'Real programme':'Demo — fictional data')+'</span></div>'
+  +'<div class="small" style="margin-top:6px">Working period saved: '+esc(saved)+'</div></div>'
+ +'<div class="lbl">Load your own period</div>'
+ +'<div class="small" style="margin:3px 0 8px">A programme file carries your framework, rules, budget, partners, cost lines and return template. '
+  +'Start from the template below, fill it with your grant agreement, and load it back.</div>'
+ +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+  +'<button type="button" class="btn" onclick="pickProgramme()">Load a programme file</button>'
+  +'<button type="button" class="tbtn" onclick="exportProgramme()">Download this one as a template</button></div>'
+ +'<div class="lbl">Hand the period on</div>'
+ +'<div class="small" style="margin:3px 0 8px">Figures, the local verdict behind each one, what was approved, and the trail of who changed what. '
+  +'Source documents are not included — they stay with the partner holding them.</div>'
+ +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+  +'<button type="button" class="btn" onclick="exportPeriod()">Export the period package</button>'
+  +'<button type="button" class="tbtn" onclick="clearWork()">Clear saved work</button></div>'
+ +'<div class="small">A loaded programme drops the demo’s scripted content: the pre-filled draft, the source conflict, the other partners’ returns, '
+  +'the canned review, the worked findings and the Q&amp;A. Those screens then show what is missing rather than an invented figure.</div>';
+}
+function openData(){drawer(dataPanel());}
 
 /* ------------------------------ state ---------------------------------- */
 let TPL=defaultTemplate(), NARRATIVE=defaultNarr();
@@ -577,7 +834,7 @@ function byteLen(s){return utf8Bytes(s).length;}
 /* What each partner holds and does not send. Sizes are the demo's own fiction,
    but the shape is not: the bulk of a consortium's evidence is person-level,
    and person-level evidence is the part that must not travel. */
-const SILO={
+let SILO={
  'Terrace Health Trust':{short:'THT',docs:[
   {n:'Clinic commissioning sign-off sheets (96)',kb:2140,pd:true},
   {n:'Certification register — Q1',kb:860,pd:true},
@@ -713,9 +970,14 @@ function head(t,s){return `<div class="pagehead"><h1 class="page">${t}</h1>${s?`
 function panel(i,c=''){return `<div class="panel ${c}">${i}</div>`;}
 function locked(m,ws,sub,label){return `<div class="locked">${m}</div>`+(ws?`<button class="btn" onclick="go('${ws}'${sub?",'"+sub+"'":''})">${label}</button>`:'');}
 function src(doc,anchor,label){
- const name=esc(label||SRC[doc].name);
+ const d=SRC[doc];
+ /* A trace is a trace only while the document it points at is in this
+    programme. When it is not, the label stays as plain text: a button that
+    opens nothing is worse than no button. */
+ if(!d)return label?`<span class="small">${esc(label)}</span>`:'';
+ const name=esc(label||d.name);
  return `<button type="button" class="src" onclick="openSource('${doc}','${attr(anchor||'')}')"
-   aria-label="Open the source: ${attr(SRC[doc].name)}">${name}</button>`;}
+   aria-label="Open the source: ${attr(d.name)}">${name}</button>`;}
 function stat(k,v,s){return `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div><div class="s">${s||''}</div></div>`;}
 function insight(t,b,act){return `<div class="insight"><div class="h">${t}</div><div>${b}</div>${act?`<div style="margin-top:11px"><button class="btn sm" onclick="toast('Added to your actions for this quarter.')">${act}</button></div>`:''}</div>`;}
 /* Dialogs: labelled, closable with Escape, focus moved in and handed back. */
@@ -756,7 +1018,8 @@ function queue(){
  if(S.persona==='partner'){
   if(TPL.status!=='active') add('amber','Waiting on the lead','The Q1 template has not been activated yet.','framework','template');
   else{
-   if(!S.conflictDone) add('red','Two of your sources disagree','OP3.1 total: 812 in the register against 1,140 on the sign-in sheets.','collect','returns');
+   if(CONFLICT&&!S.conflictDone) add('red','Two of your sources disagree',
+    CONFLICT.ind+' '+CONFLICT.field+': '+CONFLICT.options.map(o=>o.v+' ('+o.note.toLowerCase()+')').join(' against '),'collect','returns');
    const v=validate(), reds=v.filter(f=>f.sev==='red'), ambers=v.filter(f=>f.sev==='amber');
    if(reds.length>3) add('red',reds.length+' required figures still empty','Draft from your files first, then fix what is left by hand.','collect','returns');
    else reds.forEach(f=>add('red',f.field,f.msg,'collect','returns'));
@@ -769,7 +1032,7 @@ function queue(){
  }else{
   if(TPL.status==='active'){
    PARTNERS.forEach(p=>{if(!APPROVED[p]) add('amber','Review '+p,(AI_REVIEW[p]||[]).filter(i=>i.sev!=='good').length+' point(s) worth a human decision.','collect','review');});
-   if(PARTNERS.every(p=>APPROVED[p])&&!S.consolidated) add('blue','Consolidate the Q1 report','All three returns are approved.','report','consolidated');
+   if(PARTNERS.every(p=>APPROVED[p])&&!S.consolidated) add('blue','Consolidate the '+PERIOD.label+' report','All '+PARTNERS.length+' returns are approved.','report','consolidated');
    const t=costTotals();
    if(t.atRisk) add('red',eur(t.atRisk)+' would not survive an audit',COSTS.filter(c=>costFlags(c).some(x=>x.sev==='red')).length+' cost line(s) with a blocking evidence gap.','report','financial');
    const unmapped=Object.entries(MAPPING).filter(([k,v])=>!v).length;
@@ -778,7 +1041,10 @@ function queue(){
   NARRATIVE.sections.forEach(s=>{const r=s.flags.filter(f=>f.s==='red');
    if(r.length) add('red',s.t.replace(/^\d+\.\s*/,''),r[0].m,'report','narrative');});
  }
- add('amber','INTPA second phase closes in 21 days','Fit 91% — the strongest match in your pipeline.','funding');
+ /* The pipeline nudge is only worth a queue slot while there is a call in the
+    pipeline to nudge about. */
+ const best=OPPS.slice().sort((a,b)=>b.fit-a.fit)[0];
+ if(best) add('amber',best.t+' closes '+best.deadline,'Fit '+best.fit+'% — the strongest match in your pipeline.','funding');
  return q;
 }
 function renderQueue(){
@@ -1084,9 +1350,8 @@ function setLang(l){
 }
 function applyStaticLang(){
  const ru=LANG==='ru';
- document.getElementById('projline').textContent=ru
-  ?'€3,8 млн · EU / DG INTPA · консорциум из 4 партнёров · отчётный период Q1'
-  :'€3.8M · EU / DG INTPA · 4-partner consortium · Q1 reporting period';
+ const pt=document.getElementById('projtitle');if(pt)pt.textContent=PROG.title;
+ document.getElementById('projline').textContent=progLine();
  document.getElementById('cmd').placeholder=ru?'Спросите что угодно об этой программе…':'Ask this programme anything…';
  document.getElementById('qtitle').textContent=ru?'Что нужно от вас':'What needs you';
  document.getElementById('qnote').textContent=ru
@@ -1097,6 +1362,7 @@ function applyStaticLang(){
  document.getElementById('p-mel').textContent=ru?'MEL-ревьюер':'MEL reviewer';
  document.getElementById('b-tour').textContent=ru?'Тур':'Tour';
  document.getElementById('b-reset').textContent=ru?'Сброс':'Reset';
+ document.getElementById('b-data').textContent=ru?'Данные':'Data';
 }
 
 /* ------------------------------ shell ----------------------------------- */
@@ -1129,7 +1395,7 @@ function render(){
  s.classList.remove('fade');void s.offsetWidth;s.classList.add('fade');
  const sub=subOf(S.ws);
  s.innerHTML=localize((SUBNAV[S.ws]?subnav(S.ws):'')+(VIEW[sub||S.ws]||VIEW.sources)());
- renderQueue();renderTabs();
+ renderQueue();renderTabs();saveSoon();
  if(sub==='control')drawChart();
 }
 
@@ -1158,10 +1424,12 @@ VIEW.sources=function(){
 function ingest(){
  const steps=['Reading the call for proposals…','Parsing the results framework…','Mapping budget headings and phasing…','Extracting the donor reporting rules…','Binding each rule to a field…'];
  const p=document.getElementById('prog');let i=0;
- document.querySelector('.dz').innerHTML='<div style="font-family:var(--serif);font-size:17px">Reading your documents…</div>';
+ const dz=document.querySelector('.dz');
+ if(dz)dz.innerHTML='<div style="font-family:var(--serif);font-size:17px">Reading your documents…</div>';
  const t=setInterval(()=>{
-  if(i<steps.length){p.innerHTML+=`<div>· ${steps[i]}</div>`;i++;}
-  else{clearInterval(t);S.ingested=true;render();toast('Six files indexed. 16 indicators, 8 budget headings and 6 rules now enforced.');}
+  if(i<steps.length){if(p)p.innerHTML+=`<div>· ${steps[i]}</div>`;i++;}
+  else{clearInterval(t);S.ingested=true;render();
+   toast(Object.keys(SRC).length+' files indexed. '+INDICATORS.length+' indicators, '+BUDGET.length+' budget headings and '+RULES.length+' rules now enforced.');}
  },420);
 }
 
@@ -1268,7 +1536,7 @@ VIEW.returns=function(){
   +panel(`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <div style="flex:1"><div class="lbl">Status</div><div style="font-weight:650">${S.submitted?'Submitted — with the reviewer':'Draft — due in 6 working days'}</div></div>
     <span class="tag ${red?'bad':'good'}">${red} blocking</span><span class="tag ${amber?'warn':''}">${amber} to verify</span>
-    <button class="btn ghost sm" onclick="aiDraft()">Draft from my files</button>
+    ${Object.keys(DRAFT).length?'<button class="btn ghost sm" onclick="aiDraft()">Draft from my files</button>':''}
     <button type="button" class="btn sm" onclick="submitReturn()">Submit return</button></div>
    <div class="small" style="margin-top:7px">${esc(DRAFT_NOTE)}</div>`)
   +TPL.sections.map(s=>returnSection(s,flags)).join('');
@@ -1280,10 +1548,10 @@ function returnSection(s,flags){
    ${sf.length?`<span class="tag ${sf.some(f=>f.sev==='red')?'bad':'warn'}">${sf.length} flag${sf.length>1?'s':''}</span>`:'<span class="tag good">clean</span>'}</div>
   <div class="small" style="margin-bottom:11px">${esc(s.why)} ${src('guide',s.anchor,'rule')}</div>
   <div class="grid g2">${s.fields.map(f=>returnField(s.ind,f,sf.find(x=>x.field===f.l))).join('')}</div>
-  ${(s.ind===CONFLICT.ind&&!S.conflictDone)?conflictBox():''}`);
+  ${conflictOn(s.ind)?conflictBox():''}`);
 }
 function returnField(ind,f,flag){
- if(ind===CONFLICT.ind&&f.l===CONFLICT.field&&!S.conflictDone)return '';
+ if(conflictOn(ind)&&f.l===CONFLICT.field)return '';
  const v=(SUB[ind]&&SUB[ind][f.l]!==undefined)?SUB[ind][f.l]:'';
  const ver=(VERIFY[ind]&&VERIFY[ind][f.l])||'';
  const cm=(COMMENTS[ME]&&COMMENTS[ME].items&&COMMENTS[ME].items[ind+'::'+f.l])||'';
@@ -1302,6 +1570,9 @@ function returnField(ind,f,flag){
   ${!flag&&ver==='check'?`<div class="flagline amber"><span>!</span><span>could not verify against a source — confirm it</span></div>`:''}
   ${cm?`<div class="flagline"><span>·</span><span>Reviewer: ${esc(cm)}</span></div>`:''}</div>`;
 }
+/* A scripted disagreement between two of the demo's own sources. A loaded
+   programme carries none, and these three call sites go quiet. */
+function conflictOn(ind){return !!CONFLICT&&CONFLICT.ind===ind&&!S.conflictDone;}
 function conflictBox(){
  return `<div style="margin-top:12px;border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:4px;padding:13px">
   <div style="font-weight:700;color:var(--warn)">Two of your sources disagree on “${esc(CONFLICT.field)}”</div>
@@ -1315,10 +1586,10 @@ function resolveConflict(i){
  SUB[CONFLICT.ind]=SUB[CONFLICT.ind]||{};SUB[CONFLICT.ind][CONFLICT.field]=o.v;
  VERIFY[CONFLICT.ind]=VERIFY[CONFLICT.ind]||{};VERIFY[CONFLICT.ind][CONFLICT.field]=o.ok?'ok':'check';
  S.conflictDone=true;
- logEvent('Source conflict resolved','OP3.1 total set to '+o.v+' — '+o.note);
+ logEvent('Source conflict resolved',CONFLICT.ind+' '+CONFLICT.field+' set to '+o.v+' — '+o.note);
  render();
- toast(o.ok?'Recorded 812 from the deduplicated register, with the reason attached.'
-           :'Recorded 1,140 from the raw sign-in sheet — flagged as double-counted for the reviewer.');
+ toast(o.ok?'Recorded '+o.v+' from '+o.note.toLowerCase()+', with the reason attached.'
+           :'Recorded '+o.v+' from '+o.note.toLowerCase()+' — flagged for the reviewer.');
 }
 function setVal(ind,label,v){SUB[ind]=SUB[ind]||{};SUB[ind][label]=v;if(VERIFY[ind])VERIFY[ind][label]='';sched();}
 let _rt=null;function sched(){clearTimeout(_rt);_rt=setTimeout(()=>{if(S.ws==='collect')render();},800);}
@@ -1333,20 +1604,25 @@ function validate(){
  TPL.sections.forEach(s=>{
   const vals=SUB[s.ind]||{};
   s.fields.forEach(f=>{
-   if(s.ind===CONFLICT.ind&&f.l===CONFLICT.field&&!S.conflictDone){out.push({ind:s.ind,field:f.l,sev:'red',msg:'Unresolved source conflict.'});return;}
+   if(conflictOn(s.ind)&&f.l===CONFLICT.field){out.push({ind:s.ind,field:f.l,sev:'red',msg:'Unresolved source conflict.'});return;}
    const v=(vals[f.l]||'').toString().trim();
    if(f.req&&!v)out.push({ind:s.ind,field:f.l,sev:'red',msg:'Required by the donor form.'});
   });
   const nf=s.fields.find(f=>/numerator/i.test(f.l)), df=s.fields.find(f=>/denominator/i.test(f.l));
   if(nf&&df){const n=num(vals[nf.l]),d=num(vals[df.l]);
    if(n&&d&&n>d)out.push({ind:s.ind,field:nf.l,sev:'red',msg:'Numerator is larger than the denominator.'});}
-  if(s.ind==='OP3.1'){const tot=num(vals['Total certified (in-period)']),fm=num(vals['Female']),ml=num(vals['Male']);
-   if(tot&&fm&&ml&&Math.abs(tot-(fm+ml))>1)out.push({ind:s.ind,field:'Female',sev:'amber',msg:'Female + male ('+fmt(fm+ml)+') does not reconcile with the total ('+fmt(tot)+').'});}
-  if(s.ind==='OP1.3'){const p=num(vals['Female members (%)']);
-   if(p&&p<40)out.push({ind:s.ind,field:'Female members (%)',sev:'amber',msg:'Below the 40% floor in the results framework.'});}
-  if(s.ind===NARR_EXPECT.ind){const t=(vals['Narrative / barriers noted']||'').toLowerCase();
-   if(t&&t.length<50)out.push({ind:s.ind,field:'Narrative / barriers noted',sev:'amber',msg:'Too short to be usable in the donor report.'});
-   else if(t&&!NARR_EXPECT.words.some(w=>t.includes(w)))out.push({ind:s.ind,field:'Narrative / barriers noted',sev:'amber',msg:'Does not address '+NARR_EXPECT.topic+'.'});}
+  /* Disaggregation that has to add up, an inclusion floor, and a narrative
+     that has to say something. Each is declared by the section it polices, so
+     a programme with different indicators gets the same three checks. */
+  if(s.reconcile){const t=num(vals[s.reconcile.total]),parts=s.reconcile.parts.map(l=>num(vals[l]));
+   const sum=parts.reduce((a,b)=>a+b,0),tol=s.reconcile.tol||1;
+   if(t&&parts.every(x=>x)&&Math.abs(t-sum)>tol)
+    out.push({ind:s.ind,field:s.reconcile.parts[0],sev:'amber',msg:s.reconcile.parts.join(' + ')+' ('+fmt(sum)+') does not reconcile with the total ('+fmt(t)+').'});}
+  if(s.floor){const p=num(vals[s.floor.field]);
+   if(p&&p<s.floor.min)out.push({ind:s.ind,field:s.floor.field,sev:'amber',msg:s.floor.msg||('Below the '+s.floor.min+'% floor in the results framework.')});}
+  if(s.expect){const t=(vals[s.expect.field]||'').toLowerCase(),w=s.expect.words||[];
+   if(t&&t.length<(s.expect.minLen||50))out.push({ind:s.ind,field:s.expect.field,sev:'amber',msg:'Too short to be usable in the donor report.'});
+   else if(t&&w.length&&!w.some(x=>t.includes(x)))out.push({ind:s.ind,field:s.expect.field,sev:'amber',msg:'Does not address '+s.expect.topic+'.'});}
  });
  return out;
 }
@@ -1685,12 +1961,7 @@ function approveNarr(){
 
 VIEW.consolidated=function(){
  if(!S.consolidated)return head('Consolidated report')+locked('Approve the three returns, then consolidate.','collect','review','Go to review');
- const rcc=num((SUB['OP3.1']||{})['Total certified (in-period)'])||812;
- const tot=rcc+num(OTHER_SUB['Terrace Health Trust']['OP3.1']['Total certified (in-period)'])+num(OTHER_SUB['Summit Logistics Cooperative']['OP3.1']['Total certified (in-period)']);
- const all=[SUB,OTHER_SUB['Terrace Health Trust'],OTHER_SUB['Summit Logistics Cooperative']];
- const nA=all.reduce((a,v)=>a+num((v['CC1']||{})['Answered within 14 days (numerator)']),0);
- const nB=all.reduce((a,v)=>a+num((v['CC1']||{})['Feedback items received (denominator)']),0);
- const rate=nB?Math.round(nA/nB*100):0;
+ const tot=(aggregate('OP3.1')||{}).v||0, rate=(aggregate('CC1')||{}).v||0;
  const q1p=BUDGET.reduce((a,b)=>a+b.q1p,0), q1a=BUDGET.reduce((a,b)=>a+b.q1a,0);
  return head('Q1 consolidated report','Assembled from the three approved returns and the narrative. Every figure keeps its line back to a source.')
   +panel(`<h2>Hand it to the donor</h2>
@@ -1700,7 +1971,7 @@ VIEW.consolidated=function(){
       <button class="btn ghost sm" onclick="exportInterim()">Assemble the structured interim form</button>
       ${['DOCX','PDF','XLSX'].map(x=>`<button class="chip" onclick="toast('Demo only — the live product writes a real ${x} here.')">${x}</button>`).join('')}
     </div>`)
-  +panel(`<div class="lbl">European Union · DG INTPA · INTPA/TER/2025/04</div>
+  +(live()?liveReportBody(q1p,q1a):panel(`<div class="lbl">European Union · DG INTPA · INTPA/TER/2025/04</div>
     <h2 style="font-size:19px;margin:5px 0 14px">Cold Chain for Rural Clinics — Quarter 1</h2>
     <div class="lbl">1. Executive summary</div>
     <p style="font-size:13px">The consortium equipped 96 clinics ${src('logf','OP1.1 - Clinics with functioning cold chain equipment','OP1.1')},
@@ -1724,8 +1995,60 @@ VIEW.consolidated=function(){
     <p style="font-size:13px">Q1 expenditure ${eur(q1a)} against ${eur(q1p)} planned (${Math.round(q1a/q1p*100)}%).
      ${BUDGET.filter(b=>b.q1p&&Math.abs((b.q1a-b.q1p)/b.q1p)>0.10).map(b=>esc(b.h)+' '+Math.abs(Math.round((b.q1a-b.q1p)/b.q1p*100))+'% '+(b.q1a<b.q1p?'under':'over')).join(', ')} —
      each breaches the 10% rule and is explained in the narrative ${src('budg','Explain any heading deviation above 10%','budget rule')}.
-     ${costTotals().atRisk?`<br><span class="tag bad">audit exposure ${eur(costTotals().atRisk)}</span> <span class="small">cost lines that would not survive a check today — not yet cleared.</span>`:''}</p>`);
+     ${costTotals().atRisk?`<br><span class="tag bad">audit exposure ${eur(costTotals().atRisk)}</span> <span class="small">cost lines that would not survive a check today — not yet cleared.</span>`:''}</p>`));
 };
+
+/* How a consortium figure is built from partner returns. The donor decides it,
+   so each indicator declares it: a headcount sums, a rate is the ratio of the
+   two sums and never the mean of the rates, and a consortium-wide count is
+   neither and has to come from somewhere else. */
+function partnerReturns(){return PARTNERS.map(partnerValues);}
+function aggregate(code){
+ const ind=INDICATORS.find(i=>i.code===code),a=ind&&ind.agg;
+ if(!a||a.type==='none')return null;
+ const all=partnerReturns();
+ if(a.type==='sum')return{v:all.reduce((x,r)=>x+num((r[code]||{})[a.field]),0),unit:a.unit||''};
+ if(a.type==='ratio'){
+  const n=all.reduce((x,r)=>x+num((r[code]||{})[a.num]),0),
+        d=all.reduce((x,r)=>x+num((r[code]||{})[a.den]),0);
+  return d?{v:Math.round(n/d*100),unit:a.unit||'%',n:n,d:d}:null;}
+ return null;
+}
+function aggNote(code){const i=INDICATORS.find(x=>x.code===code);return (i&&i.agg&&i.agg.note)||'';}
+function indicatorValue(code){
+ const g=aggregate(code);
+ if(g)return fmt(g.v)+(g.unit||'');
+ /* Nothing in the returns adds up to this one. The demo has a figure ready;
+    a real period says so instead of inventing one. */
+ return IND_FALLBACK[code]||'—';
+}
+
+/* The donor report a real period produces: the indicators this programme
+   actually declared, valued from the returns that actually came in, and an
+   empty cell where nothing did. */
+function liveReportBody(q1p,q1a){
+ return panel(`<div class="lbl">${esc(progLine())}</div>
+   <h2 style="font-size:19px;margin:5px 0 14px">${esc(PROG.title)} — ${esc(PERIOD.label)}</h2>
+   <div class="lbl">1. Results by indicator</div>
+   <table style="margin-top:6px"><thead><tr><th>Code</th><th>Target</th><th>Actual</th><th>How it was built</th></tr></thead><tbody>
+   ${INDICATORS.map(i=>{const g=aggregate(i.code);
+     return `<tr><td class="mono">${esc(i.code)}</td><td>${esc(i.target)}</td>
+      <td class="mono" style="font-weight:700">${g?esc(fmt(g.v)+(g.unit||'')):'—'}</td>
+      <td class="small">${g?(g.d!==undefined?'ratio of summed returns ('+fmt(g.n)+'/'+fmt(g.d)+')':'sum of partner returns'):esc(aggNote(i.code)||'not built from partner returns')}</td></tr>`;}).join('')}
+   </tbody></table>
+   ${INDICATORS.some(i=>!aggregate(i.code))?`<div class="small" style="margin-top:8px"><span class="tag warn">incomplete</span>
+     Indicators with no value are not calculated anywhere. Give them an aggregation in the programme file, or carry the figure in the narrative and say where it came from.</div>`:''}
+   <div class="rule"></div>
+   <div class="lbl">2. Narrative</div>
+   ${NARRATIVE.sections.map(s=>`<div style="margin-top:9px"><b style="font-size:13px">${esc(s.t)}</b>
+     ${s.approved?'<span class="tag good">approved</span>':'<span class="tag warn">provisional</span>'}
+     <div style="font-size:13px">${s.v?esc(s.v):'<span class="small">— empty —</span>'}</div></div>`).join('')}
+   <div class="rule"></div>
+   <div class="lbl">3. Financial report</div>
+   <p style="font-size:13px">Expenditure ${eur(q1a)} against ${eur(q1p)} planned (${q1p?Math.round(q1a/q1p*100):0}%).
+    ${BUDGET.filter(b=>b.q1p&&Math.abs((b.q1a-b.q1p)/b.q1p)>0.10).map(b=>esc(b.h)+' '+Math.abs(Math.round((b.q1a-b.q1p)/b.q1p*100))+'% '+(b.q1a<b.q1p?'under':'over')).join(', ')||'No heading deviates by more than 10%.'}
+    ${costTotals().atRisk?`<br><span class="tag bad">audit exposure ${eur(costTotals().atRisk)}</span> <span class="small">cost lines that would not survive a check today — not yet cleared.</span>`:''}</p>`);
+}
 
 /* ---- donor hand-over: indicator encoding + structured interim form ---- */
 function setMapping(code,v){MAPPING[code]=v;logEvent('Indicator mapped',code+' → '+(v||'unmapped'));render();
@@ -1749,16 +2072,6 @@ function exportResults(replace){
    ?`<span class="tag bad">${unmapped} unmapped</span> <span class="small">The system rejects a submission with an unmapped indicator. Map them, or mark them as project-specific.</span>`
    :`<span class="tag good">ready to encode</span> <span class="small">All indicators carry a core-list target and a value with its source.</span>`}</div>
   <div style="margin-top:12px"><button class="btn" ${unmapped?'disabled':''} onclick="toast('Demo only — the live product writes the encoded logframe into the donor system and stores the confirmation.');closeModal(this.closest('.modal-wrap'))">Encode ${PERIOD.label}</button></div>`,'720px');
-}
-function indicatorValue(code){
- const all=[SUB,OTHER_SUB['Terrace Health Trust'],OTHER_SUB['Summit Logistics Cooperative']];
- if(code==='OP3.1')return fmt(all.reduce((a,v)=>a+num((v['OP3.1']||{})['Total certified (in-period)']),0));
- if(code==='CC1'){const n=all.reduce((a,v)=>a+num((v['CC1']||{})['Answered within 14 days (numerator)']),0),
-  d=all.reduce((a,v)=>a+num((v['CC1']||{})['Feedback items received (denominator)']),0);return d?Math.round(n/d*100)+'%':'—';}
- if(code==='OC2.2'){const n=all.reduce((a,v)=>a+num((v['OC2.2']||{})['Reporting confidence (numerator)']),0),
-  d=all.reduce((a,v)=>a+num((v['OC2.2']||{})['Surveyed (denominator)']),0);return d?Math.round(n/d*100)+'%':'—';}
- if(code==='OP1.3')return '11';   // consortium-wide count, not a sum of partner rosters
- return {'OC1.1':'91%','OP1.1':'96','OP2.1':'1,104'}[code]||'—';
 }
 function exportInterim(){
  const t=costTotals();
@@ -1843,6 +2156,7 @@ VIEW.learning=function(){
     <div class="note" style="margin-top:9px"><b>Suggested action.</b> ${esc(f.action)}</div>
     <div class="chiprow" style="margin-top:9px">${f.src.map(s=>src(s[0],s[1],'source')).join('')}
      ${f.check?'<span class="tag warn">needs one more data point</span>':''}</div>`)).join('')
+  +(FINDINGS.length?'':panel(`<div class="small">No findings yet. A finding is written against a learning question once the returns hold enough to answer it — the demo ships three worked ones.</div>`))
   +panel(`<h2>This quarter’s open question</h2><div id="plqbox">${plqRows()}</div>
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" onclick="addPLQ()">Add</button>
     <button class="btn sm" onclick="learningDoc()">Generate the learning document</button></div>`);
@@ -1879,7 +2193,7 @@ Action: supervised drop-in desks and a voice channel; review in six weeks.</div>
 VIEW.funding=function(){
  const fit=S.curFit;
  return head('Funding','What this consortium’s delivery record already qualifies it for — matched on evidence, not keywords.')
-  +panel(`<h2>Open calls</h2>${OPPS.map((o,i)=>`<div class="item" style="display:flex;gap:12px;align-items:flex-start;margin-top:9px">
+  +panel(`<h2>Open calls</h2>${OPPS.length?'':'<div class="small">No calls are loaded for this programme. The demo carries a worked pipeline; a real period brings its own, or none.</div>'}${OPPS.map((o,i)=>`<div class="item" style="display:flex;gap:12px;align-items:flex-start;margin-top:9px">
     <div style="width:52px;flex:none;text-align:center">
       <div style="font-family:var(--serif);font-size:20px;color:${o.fit>85?'var(--good)':o.fit>70?'var(--warn)':'var(--muted)'}">${o.fit}%</div>
       <div class="lbl" style="font-size:8px">fit</div></div>
@@ -1924,7 +2238,7 @@ function ask(){
      <div class="chiprow" style="margin-top:12px">${hit.src.map(s=>src(s[0],s[1],'source')).join('')}</div>
      <div class="small" style="margin-top:10px">Answered from this programme’s own documents and returns. If the data is not there, Vizier says so instead of guessing.</div>`
     :`<div style="font-size:13px">Nothing in this programme answers that yet.</div>
-      <div class="lbl" style="margin-top:14px">Try one of these</div>
+      ${QA.length?'<div class="lbl" style="margin-top:14px">Try one of these</div>':'<div class="small" style="margin-top:10px">This programme carries no worked questions. The demo ships six.</div>'}
       <div style="margin-top:6px">${QA.map(x=>`<button class="chip" style="display:block;text-align:left;margin-bottom:6px;width:100%" onclick="document.getElementById('cmd').value=this.textContent.trim();ask()">${esc(x.q)}</button>`).join('')}</div>`}`);
  },600);
 }
@@ -1979,26 +2293,35 @@ const TOUR_RU=[
 function nextStep(){ti++;if(ti>=TOUR.length){endTour();return;}tourStep();}
 function endTour(){document.getElementById('coach').classList.add('hidden');ti=-1;}
 
-function resetDemo(){
+/* A period is the working state that sits on top of a programme: what partners
+   filed, what checks said, what the lead approved. Loading a programme starts a
+   fresh one; nothing of the previous period survives into it. */
+function resetPeriod(){
  TPL=defaultTemplate();NARRATIVE=defaultNarr();SUB={};VERIFY={};COMMENTS={};APPROVED={};
- LQS=[...LEARNING_Q];PLQ=['How is the alarm-response routine landing with clinic staff?'];PIPELINE=[];
- COSTS=defaultCosts();LEDGER=[];WIRE=[];ENV_SENT={};ANSWERS={};MAPPING={'OP3.1':'CI-03','OP1.1':'CI-02','CC1':'CI-04','OP2.1':'','OC1.1':'','OP1.3':'','OC2.2':''};
+ LQS=[...LEARNING_Q];PLQ=[...PLQ_SEED];PIPELINE=[];
+ COSTS=defaultCosts();LEDGER=[];WIRE=[];ENV_SENT={};ANSWERS={};MAPPING=clone(MAPPING_SEED);
  Object.assign(S,{persona:'lead',ws:'sources',sub:{},ingested:false,submitted:false,conflictDone:false,
-  consolidated:false,reviewTarget:'',propReviewed:false,curFit:PROP_REVIEW.fit});
+  consolidated:false,reviewTarget:'',propReviewed:false,curFit:(PROP_REVIEW&&PROP_REVIEW.fit)||0});
  ['lead','partner','mel'].forEach(x=>{const b=document.getElementById('p-'+x);
-  b.classList.toggle('active',x==='lead');b.setAttribute('aria-pressed',String(x==='lead'));});
+  if(b){b.classList.toggle('active',x==='lead');b.setAttribute('aria-pressed',String(x==='lead'));}});
  const d=document.getElementById('drawer');if(d)d.remove();
- endTour();render();toast('Demo reset.');
+ endTour();applyStaticLang();
 }
+function resetDemo(){applyProgramme(DEMO_PROGRAMME);saveWork();render();toast('Demo reset.');}
 
 /* ============================ BOOT ====================================== */
 VIEW.collect=function(){return VIEW.returns();};
 VIEW.framework=function(){return VIEW.model();};
 VIEW.report=function(){return VIEW.narrative();};
 VIEW.signals=function(){return VIEW.control();};
+/* The demo is itself a programme file — the one the Data panel hands out as a
+   template, and the one Reset goes back to. */
+const DEMO_PROGRAMME=programmeSnapshot();
+const RESTORED=loadWork();
 applyStaticLang();
 document.getElementById('lang-'+LANG).classList.add('active');
 render();
+if(RESTORED)toast('Restored '+PROG.title+' — '+PERIOD.label+', saved in this browser.');
 </script>
 </body>
 </html>
