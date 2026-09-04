@@ -49,6 +49,19 @@ def check_page(path: Path) -> list[str]:
     )
     if "v4d_lang" not in text or not has_language_content:
         errors.append(f"{path.name}: bilingual language contract is incomplete")
+    if path.name == "index.html":
+        # A loaded programme must stay swappable and its staging separable;
+        # these are the seams the programme file depends on.
+        for required in (
+            "vizier4dev/programme@1",
+            "vizier4dev/period@1",
+            "function validateProgramme",
+            "function applyProgramme",
+            "function programmeSnapshot",
+            'id="progfile"',
+        ):
+            if required not in text:
+                errors.append(f"{path.name}: programme-file contract is incomplete, missing {required}")
 
     for href in parser.links:
         if href.startswith(("#", "http://", "https://", "mailto:")):
