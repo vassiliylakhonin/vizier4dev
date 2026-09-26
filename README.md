@@ -1,5 +1,8 @@
 # Vizier4Dev
 
+**See how a grant consortium could trace every reported figure back to its source without moving partners' source files into one shared server.** [Open the fictional, bilingual demo](https://vizier4dev.pages.dev/) and follow one quarterly period from partner input to checks and donor handover. Nothing is submitted to a donor. This is a local-browser prototype, with no backend, customers or pilot. [Load your own programme file](#your-own-period) only after reviewing its [file contract](docs/programme-file.md).
+
+
 Quarterly reporting workspace for grant-funded consortia. Two self-contained HTML files, no build step, no dependencies, no network calls.
 
 [![Vizier4Dev workspace preview](assets/vizier-preview.png)](https://vizier4dev.pages.dev/)
