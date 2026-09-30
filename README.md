@@ -1,105 +1,59 @@
 # Vizier4Dev
 
-**See how a grant consortium could trace every reported figure back to its source without moving partners' source files into one shared server.** [Open the fictional, bilingual demo](https://vizier4dev.pages.dev/) and follow one quarterly period from partner input to checks and donor handover. Nothing is submitted to a donor. This is a local-browser prototype, with no backend, customers or pilot. [Load your own programme file](#your-own-period) only after reviewing its [file contract](docs/programme-file.md).
+A bilingual browser prototype for quarterly reporting in grant-funded consortia: trace figures to source references, check indicator and cost rules, review partner returns, and prepare donor handover files.
 
+**Status:** working demo on fictional data, with no backend, accounts, customers, or pilot. Donor handover prepares exports; it submits nothing.
 
-Quarterly reporting workspace for grant-funded consortia. Two self-contained HTML files, no build step, no dependencies, no network calls.
+[Open the demo](https://vizier4dev.pages.dev/) · [Programme-file contract](docs/programme-file.md)
 
-[![Vizier4Dev workspace preview](assets/vizier-preview.png)](https://vizier4dev.pages.dev/)
+[![Workspace preview](assets/vizier-preview.png)](https://vizier4dev.pages.dev/)
 
-- `index.html` — the demo workspace. Open it in a browser.
-- `landing.html` — the public page describing it, linking to the demo.
-- `examples/rural-water-points.json` — a second worked programme, to load into it.
-- `examples/partner-return-oblast-vodokanal.json` — a partner return for that programme, to import.
+## Try it
 
-## Your own period
+Open [index.html](index.html) in a browser, or use the hosted demo. There is no build step or dependency installation. [landing.html](landing.html) is the public introduction.
 
-**Data → Load a programme file** replaces the demo's action with yours: your
-framework, donor rules, budget, partners, cost lines and return template, under
-the same rules engine. **Data → Download this one as a template** writes the
-demo out as a valid file to start from, and
-[`docs/programme-file.md`](docs/programme-file.md) is the contract.
+Follow one fictional reporting period through:
 
-Still no backend. The file is read in the browser, the working period is saved
-in that browser and restored on reload, and what leaves is what you export —
-either the period package (figures, verdicts, approvals, the ledger) or nothing.
+1. **Framework and collection:** inspect indicators, budget lines, donor rules, and partner inputs.
+2. **Checks:** see inconsistent totals, source conflicts, and cost-eligibility findings with their stated reasons.
+3. **Partner returns:** export a return locally and import it into the lead's period. Wrong programme, period, partner, or malformed digest causes refusal.
+4. **Review and handover:** switch lead, partner, and MEL-reviewer roles; resolve review items and prepare the donor export.
 
-A loaded programme drops the demo's staged content: the pre-filled draft, the
-source conflict, the other partners' returns already on file, the canned review,
-the worked findings and the Q&A. Those screens then say what is missing rather
-than showing an invented figure. What stays working is what is actually
-computed — the donor checks, the cost-eligibility flags, the partner boundary,
-the aggregation into consortium figures, the hand-over gates.
+Role switching demonstrates the workflow in one browser. It does not authenticate a person or provide server-enforced access control.
 
-## What it demonstrates
+## Load your own period
 
-A reporting period for a four-partner, EU-funded action, run end to end:
+Use **Data → Download this one as a template**, edit the resulting programme file, then choose **Data → Load a programme file**. Review the [file contract](docs/programme-file.md) first.
 
-1. **Sources** — grant documents are indexed; every figure keeps a link back to the file and line it came from.
-2. **Framework** — indicators, targets, budget headings and six donor rules are extracted, and each rule is bound to the field it will police.
-3. **Collection** — partners file results and cost lines. Figures are checked while they are typed: disaggregation that does not reconcile, a numerator above its denominator, a percentage below the framework floor, a narrative too thin to use, and two of a partner's own sources disagreeing on the same total.
-4. **Costs and audit** — cost lines are checked against documented reasons costs are declared ineligible: personnel time with no signed timesheet, procurement above the threshold with no comparison of offers, a cost dated outside the period, a cost not linked to any output, a bonus that is not eligible, a local-currency payment converted at a rate the agreement does not recognise, an advance declared before it was cleared, a payroll component that is never eligible, and a sub-implementer's overhead charged twice. Each finding names the category it belongs to, so where a donor publishes what its own auditors find, the screen shows which of those categories these rules can raise — and which they cannot. The screen carries two numbers: what was declared, and what would not survive a check today.
-5. **Partner boundary** — each partner checks its own evidence where it sits and sends the verdict, not the file. A partner exports its return as a file it can read in full before it goes; the lead imports it, and a return for the wrong programme, the wrong period, an unknown partner or with a malformed digest is refused whole. The sign-in sheets, payroll, invoices and registers stay at the organisation holding them; what crosses is the figures the donor asks for, the status of each local check in one of four words, and a digest binding the figure to the evidence it was checked against. A gap opens a second round of a few dozen bytes rather than a folder. The screen counts both sides — what crossed, and what did not.
-6. **Reporting** — narrative drafted from the same data, reviewer comments routed to the exact line, consolidation once all returns are approved.
-7. **Hand-over** — the approved figures are encoded for a donor results system (with an indicator-mapping gate) or assembled into a structured interim form with its sub-chapters.
-8. **Signals and funding** — control room, learning questions, and a funding pipeline with a draft-proposal review.
+A second worked programme and partner return are included:
 
-A role switcher (lead / partner / MEL reviewer) changes both permissions and the work queue on the left, which is rebuilt from the donor rules and the state of the period.
+- [Rural water points](examples/rural-water-points.json)
+- [Partner return](examples/partner-return-oblast-vodokanal.json)
 
-### On the boundary
+Loading your own programme removes staged narratives, canned review, and demo findings. Missing information stays missing; the checks, aggregation, partner-return validation, and handover gates continue to compute from the loaded data.
 
-A consortium that mails spreadsheets has already transferred everything, and the only question left is who bothers to read it. The claim the boundary makes is narrower and checkable: this many bytes left the building, and no others.
+Files are read locally. The working period is saved in the current browser and restored on reload. Partner source files remain with the partner; exchanged returns contain reporting figures, local check statuses, and evidence digests. Review any export before sharing it.
 
-The digest lets the lead tell that a partner has not changed a register underneath an approved return. It does not prove the register was right in the first place, does not establish who compiled it, and is not an audit — a donor auditor still visits the partner and reads the file. The check verdicts cross as fixed words (`MET`, `NOT_MET`, `UNKNOWN`, `NOT_APPLICABLE`) so there is nothing for prose to soften on the way out.
+A digest binds a return to declared evidence. It does not establish that evidence is correct or who supplied it. Human review and donor audit remain separate.
 
-## Languages
+## Languages and limits
 
-English and Russian, switchable in the top bar of both files; the choice is remembered in `localStorage`.
+The interface supports English and Russian, with the selection remembered locally. Donor indicator codes, field labels, document contents, and partner names retain their source language.
 
-What Vizier says to you is translated. What comes out of the donor's own documents — indicator codes and labels, form field labels, file contents, budget headings, partner names — stays in the donor's language, because that is what gets submitted and what an auditor reads.
+The prototype supports one period in one browser. Partners exchange files; there is no shared workspace, concurrent editing, or quarterly history. The fictional demo illustrates rule handling, while actual thresholds and eligibility rules must come from the programme's grant agreement.
 
-## Status
+No network APIs or external scripts are used by the workspace. Local storage is not a managed confidential-data service. Outputs require human review before donor filing and do not constitute legal, financial, compliance, or audit advice.
 
-Working demo on fictional data, and a file contract for running a real period on
-your own. No account, no server, no service behind it. No customers, no pilots.
-
-Known limits before a pilot: one period at a time with no history across
-quarters; one browser and no accounts, so partners exchange returns as files
-rather than sharing a workspace, and two people cannot work the same period at
-once; the donor hand-over encodes and assembles but submits nothing.
-
-The programme, the partners and every figure are invented. The rules the demo enforces follow published guidance on EU grant reporting and audit findings; thresholds and the reporting period belong to a grant agreement and change per action.
-
-Not legal, financial, compliance or audit advice. Human review is required before anything is filed with a donor.
-
-## Deployment
-
-`./deploy.sh` validates and publishes `index.html`, `landing.html`, `robots.txt` and `_headers` to Cloudflare Pages. Only those four files are served; nothing else in the repository is.
-
-Locally it uses the existing `wrangler` login. The manual GitHub Actions workflow
-`.github/workflows/deploy.yml` uses the repository secrets
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, making the deployment path
-reproducible without relying on an untracked local Git hook.
-
-The published site is closed to search engines — `robots.txt` disallows crawling
-and `_headers` sends `X-Robots-Tag`. The same file sets CSP, content-type,
-referrer, permissions, and opener policies. It is still reachable by anyone
-holding the address, so the demo contains fictional data only.
-
-## Checks
+## Development and deployment
 
 ```bash
 python3 scripts/check_static.py
 ```
 
-CI verifies both pages, their local links, bilingual contract, absence of network
-APIs/external scripts, and the required response headers.
+CI checks both pages, local links, the bilingual contract, absence of network APIs and external scripts, and response headers.
 
-## Open items
+[deploy.sh](deploy.sh) validates and publishes only `index.html`, `landing.html`, `robots.txt`, and `_headers` to Cloudflare Pages. The [manual deployment workflow](.github/workflows/deploy.yml) uses the configured Cloudflare repository secrets.
 
-- The founder paragraph and the price block on `landing.html` are marked as drafts. They must be filled in or removed before the page is shown to anyone outside a working conversation.
-- The contact link points at a personal mailbox; a domain address is the fix.
+The hosted demo is publicly reachable by its address, although crawling is disallowed. Use fictional data for the public demo. The landing page's founder and pricing drafts, and its personal contact address, remain open items before broader publication.
 
-## License
-
-[MIT](LICENSE)
+[MIT license](LICENSE).
