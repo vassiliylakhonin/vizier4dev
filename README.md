@@ -6,6 +6,16 @@ A bilingual browser prototype for quarterly reporting in grant-funded consortia:
 
 [Open the demo](https://vizier4dev.pages.dev/) · [Programme-file contract](docs/programme-file.md)
 
+## Choose a starting point
+
+| Your task | Start here | What happens |
+| --- | --- | --- |
+| Explore a reporting period | [Hosted fictional demo](https://vizier4dev.pages.dev/) | Walk through collection, checks, review and handover |
+| Inspect programme and partner-return formats | [Worked programme files](#load-your-own-period) | Load local files into one browser workspace |
+| Check suitability for your workflow | [Languages, storage and limits](#languages-and-limits) | Review the prototype's data and access boundaries |
+| Run or inspect the source | [Development checks](#development-and-deployment) | Static pages; no application build step |
+
+
 [![Workspace preview](assets/vizier-preview.png)](https://vizier4dev.pages.dev/)
 
 ## Try it
